@@ -27,8 +27,15 @@ DC_NEWS_FEEDS = {
     "DataCentreNews India":  "https://datacentrenews.in/feed",
     "DataCenterNews Asia":   "https://datacenternews.asia/feed",
     "Express Computer":      "https://www.expresscomputer.in/feed/",
+    # --- Press wires (✅ verified 2026-06-29) — geo-filter keeps India/GCC only ---
+    "PR Newswire Tech":      "https://www.prnewswire.com/rss/business-technology-latest-news/business-technology-latest-news-list.rss",
+    "PR Newswire Energy":    "https://www.prnewswire.com/rss/energy-latest-news/energy-latest-news-list.rss",
+    "GNews BusinessWire":    "https://news.google.com/rss/search?q=site:businesswire.com+%28%22data+center%22+OR+datacentre%29+%28India+OR+UAE+OR+Saudi+OR+Qatar+OR+GCC%29+when:7d&hl=en",
     # <-- ADD A NEWS FEED: "Name": "https://.../feed",
+    # Available but noisy (firehose): PRN all releases
+    #   https://www.prnewswire.com/rss/news-releases-list.rss
     # Business Standard topic RSS: DROPPED — Akamai 403 to scripts (Google News geo covers it).
+    # Business Wire: no stable RSS (redirects to newsroom) → discover via GNews site query below.
 }
 
 # ===========================================================================
@@ -187,10 +194,42 @@ REDDIT_FEEDS = {
     "r/aws":        "https://www.reddit.com/r/aws/.rss",
     # <-- ADD a subreddit: "r/name": "https://www.reddit.com/r/name/.rss",
 }
-# (d) GDELT — no-key JSON, but hard rate-limited (≤1 req/5s, often 429).
+# (d) PeeringDB — free JSON, no key. Facility + internet-exchange presence (Network/Colo).
+#     ✅ verified: 245 India facs, 59 GCC facs, 54 IXs. Confirms PRESENCE, not a new
+#     development (signal_type=facility-presence, confidence=high). One-time census, then deduped.
+PEERINGDB_FAC_URLS = {
+    "India": "https://www.peeringdb.com/api/fac?country=IN&limit=1000",
+    "GCC":   "https://www.peeringdb.com/api/fac?country__in=AE%2CSA%2CQA%2CBH%2CKW%2COM&limit=1000",
+}
+PEERINGDB_IX_URL = "https://www.peeringdb.com/api/ix?country__in=IN%2CAE%2CSA%2CQA%2CBH%2CKW%2COM&limit=1000"
+
+# (e) GDELT — no-key JSON, but hard rate-limited (≤1 req/5s, often 429).
 #     DAILY BACKFILL ONLY, never the hourly path. Throttle hard.
 GDELT_DOC_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 GDELT_QUERY   = '"data center" (India OR UAE OR "Saudi Arabia" OR Qatar OR Bahrain OR Kuwait OR Oman)'
+
+# ===========================================================================
+# 6b. REGISTERED — validated, not yet wired (each needs a connector; build next)
+# ===========================================================================
+# India power/capacity context (CEA, free JSON, no key). ✅ live. Macro context, NOT
+# per-development rows — wire as enrichment/reference, keep out of the SS4 firehose.
+# renewable_energy.php returns malformed data → excluded.
+CEA_APIS = {
+    "installed_capacity_statewise": "https://cea.nic.in/api/installed_capacity_statewise.php",
+    "psp_peak":                     "https://cea.nic.in/api/psp_peak.php",
+    "transmission_lines":           "https://cea.nic.in/api/transmission_lines.php",
+    "transformation_substations":   "https://cea.nic.in/api/transformation_substations.php",
+}
+# Entity spine (for SS5 NER, future): GLEIF legal identity (free, no key, paginated).
+GLEIF_LEI_SEARCH = "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D={name}&page%5Bsize%5D=10"
+# India entity spine — MCA Company Master Data via data.gov.in (needs DATA_GOV_IN_API_KEY env).
+DATA_GOV_IN_API_PAGE = "https://www.data.gov.in/apis/ec58dab7-d891-4abb-936e-d5d274a6ce9b"
+# DC Hub facility enrichment — MANUAL/optional only. MCP is 10/day; this backend REST
+# answered with no auth (count+data) but is an undocumented internal URL — do not auto-pull.
+DCHUB_BACKEND_FAC = "https://dchub-backend-production.up.railway.app/api/v1/facilities?country={cc}&limit=20"
+# Deferred (validated-and-rejected for v1): Hacker News Algolia (India≈Indiana noise),
+# Bluesky/Mastodon (403 / noisy — wait for curated handles), regulations.gov NEPA (US scope),
+# eProcurement portals (no stable API).
 # ponytail: DEFERRED OSINT (build when jobs+Adzuna+Reddit prove SS4 earns its keep):
 #   - Twitter/X handles  (no free API; needs X key or stable nitter mirror)
 #   - Interconnection queues / power filings (LBNL Excel, National Grid CSV) — Cloudflare-blocked to curl

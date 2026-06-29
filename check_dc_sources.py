@@ -74,6 +74,11 @@ def main():
     total += 1
     live += _check("SEC EDGAR FTS",
                    f"{dc.EDGAR_FTS_URL}?q=%22data+center%22&forms=8-K", want="json")
+    for geo, url in dc.PEERINGDB_FAC_URLS.items():
+        total += 1
+        live += _check(f"PeeringDB fac {geo}", url, want="json")
+    total += 1
+    live += _check("PeeringDB ix", dc.PEERINGDB_IX_URL, want="json")
     for token in dc.GREENHOUSE_TOKENS:
         total += 1
         live += _check(f"Greenhouse/{token}",

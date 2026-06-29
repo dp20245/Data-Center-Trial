@@ -24,6 +24,20 @@ def _get(url):
         return json.loads(r.read().decode("utf-8", "ignore"))
 
 
+def _get_retry(url, tries=4):
+    """GET JSON with backoff on 429/5xx (PeeringDB rate-limits rapid calls)."""
+    delay = 2
+    for attempt in range(tries):
+        try:
+            return _get(url)
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 502, 503) and attempt < tries - 1:
+                time.sleep(delay)
+                delay = min(delay * 2, 16)
+                continue
+            raise
+
+
 def _oid(*parts):
     return hashlib.sha1("|".join(parts).encode()).hexdigest()[:12]
 
@@ -108,6 +122,40 @@ def fetch_adzuna(per_country=20):
     return rows
 
 
+def fetch_peeringdb():
+    """SS4 facility + IX presence (Network/Colo). Free JSON, no key. Confirms
+    presence (signal_type=facility-presence), not a new development."""
+    rows = []
+    for geo, url in dc.PEERINGDB_FAC_URLS.items():
+        try:
+            time.sleep(1.5)
+            for f in _get_retry(url).get("data", []):
+                name = f.get("name", "")
+                rows.append(_row(
+                    _oid("pdb-fac", str(f.get("id"))), f.get("updated", ""),
+                    "facility-presence", f.get("org_name") or name, geo,
+                    "; ".join(dc_ingest.tag_layers(name.lower())) or "Colo",
+                    f"{f.get('net_count', 0)} nets", "high",
+                    f"https://www.peeringdb.com/fac/{f.get('id')}",
+                    f"{name} — {f.get('city', '')}, {f.get('country', '')}"))
+        except Exception as exc:
+            print(f"  [peeringdb fac {geo}] {exc}")
+    try:
+        time.sleep(1.5)
+        for ix in _get_retry(dc.PEERINGDB_IX_URL).get("data", []):
+            name = ix.get("name", "")
+            rows.append(_row(
+                _oid("pdb-ix", str(ix.get("id"))), ix.get("updated", ""),
+                "facility-presence", ix.get("org_name") or name, ix.get("country", ""),
+                "Network", f"{ix.get('net_count', 0)} nets", "high",
+                f"https://www.peeringdb.com/ix/{ix.get('id')}",
+                f"IX: {name} — {ix.get('city', '')}, {ix.get('country', '')}"))
+    except Exception as exc:
+        print(f"  [peeringdb ix] {exc}")
+    return rows
+
+
 def fetch_all():
-    rows = fetch_greenhouse() + fetch_lever() + fetch_adzuna()
-    return rows, {"OSINT jobs": len(rows)}
+    jobs = fetch_greenhouse() + fetch_lever() + fetch_adzuna()
+    facilities = fetch_peeringdb()
+    return jobs + facilities, {"OSINT jobs": len(jobs), "PeeringDB facilities": len(facilities)}
