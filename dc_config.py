@@ -120,8 +120,11 @@ POLICY_GNEWS_GEO = {
 # SEC EDGAR full-text search: free JSON, NO key. Requires a descriptive
 # User-Agent set via the SEC_USER_AGENT env var (e.g. "Name email@x.com").
 EDGAR_FTS_URL = "https://efts.sec.gov/LATEST/search-index"
-EDGAR_QUERY   = '"data center" (India OR UAE OR "Saudi Arabia" OR Qatar OR GCC OR partnership OR "joint venture")'
 EDGAR_FORMS   = "8-K,6-K,10-K,20-F"
+# FTS ANDs terms and ignores OR/parens, so we run one phrase query per market.
+EDGAR_GEO_TERMS = ['"data center" India', '"data center" UAE',
+                   '"data center" "Saudi Arabia"', '"data center" Qatar',
+                   '"data centre" India']
 # Poll these CIKs' submissions feeds directly (data.sec.gov/submissions/CIK##########.json):
 EDGAR_CIKS = {
     "Equinix":        "0001101239",

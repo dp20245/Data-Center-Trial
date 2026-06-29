@@ -99,22 +99,30 @@ def _gnews_publisher(entry, title):
     return pub, title
 
 
-def fetch():
-    """Return (rows, health). Each feed gets an optional geo hint: the geo-scoped
-    Google News feeds are already country-bound, so an item with no detected geo
-    inherits the feed's country instead of being dropped."""
-    feeds = [(name, url, None) for name, url in dc.DC_NEWS_FEEDS.items()]
-    for name, url in dc.DC_GNEWS_GEO.items():
-        hint = name.replace("GNews ", "").strip()  # "GNews India" -> "India"
-        hint = {"Saudi": "Saudi Arabia"}.get(hint, hint)
-        feeds.append((name, url, hint))
+def _gnews_geo_hints():
+    """Map each geo-scoped Google News feed name to its country."""
+    hints = {}
+    for name in dc.DC_GNEWS_GEO:
+        c = name.replace("GNews ", "").strip()
+        hints[name] = {"Saudi": "Saudi Arabia"}.get(c, c)
+    return hints
 
+
+def pull(feeds, geo_hints=None, type_of=None, geo_required=True):
+    """Generic RSS pull shared by SS1/SS2/SS4.
+
+    feeds        : {name: url}
+    geo_hints    : {name: country}  — fallback geo for already-scoped feeds
+    type_of      : fn(name) -> type flag for the `type` column (else feed/gnews-geo)
+    geo_required : drop items with no India/GCC signal (True for in-scope tabs)
+    """
+    geo_hints = geo_hints or {}
     rows, health = [], {}
-    for name, url, geo_hint in feeds:
+    for name, url in feeds.items():
         is_gnews = "news.google.com" in url
+        hint = geo_hints.get(name)
         try:
-            parsed = feedparser.parse(url)
-            entries = parsed.entries or []
+            entries = feedparser.parse(url).entries or []
             health[name] = len(entries)
             for e in entries:
                 title = _strip(e.get("title", ""))
@@ -127,11 +135,9 @@ def fetch():
                     pub, title = _gnews_publisher(e, title)
                     source = pub or name
                 text = f"{title} {summary}".lower()
-                geos = tag_geo(text)
-                if not geos and geo_hint:
-                    geos = [geo_hint]
-                if not geos:
-                    continue  # out of India/GCC scope -> drop
+                geos = tag_geo(text) or ([hint] if hint else [])
+                if geo_required and not geos:
+                    continue
                 layers = tag_layers(text)
                 rows.append({
                     "id": article_id(link),
@@ -142,7 +148,7 @@ def fetch():
                     "title": title,
                     "url": clean_link(link),
                     "summary": summary[:500],
-                    "type": "gnews-geo" if is_gnews else "feed",
+                    "type": type_of(name) if type_of else ("gnews-geo" if is_gnews else "feed"),
                     "primary_layer": layers[0] if layers else "General",
                     "text": f"{title}. {summary}"[:1000],
                 })
@@ -150,6 +156,35 @@ def fetch():
             health[name] = 0
             print(f"  [feed error] {name}: {exc}")
     return rows, health
+
+
+def fetch():
+    """SS1 News: specialist trade press + per-market Google News."""
+    feeds = {**dc.DC_NEWS_FEEDS, **dc.DC_GNEWS_GEO}
+    return pull(feeds, geo_hints=_gnews_geo_hints())
+
+
+# Policy source -> type flag for SS2.
+_POLICY_TYPE = {
+    "CSET Georgetown": "analysis",
+    "PIB India": "legislation", "SEBI": "regulation",
+    "Boursa Kuwait": "regulation", "Oman News Agency Economy": "legislation",
+}
+
+
+def fetch_policy():
+    """SS2 Policy: think-tank analysis + India/GCC government/market feeds + geo proxy."""
+    feeds = {**dc.DC_POLICY_FEEDS, **dc.POLICY_GNEWS_GEO}
+    hints = {n: n.replace("GNews ", "").replace(" Policy", "").strip()
+             for n in dc.POLICY_GNEWS_GEO}
+    hints = {n: {"Saudi": "Saudi Arabia"}.get(v, v) for n, v in hints.items()}
+    return pull(feeds, geo_hints=hints,
+                type_of=lambda n: _POLICY_TYPE.get(n, "regulation"))
+
+
+def fetch_reddit():
+    """SS4 OSINT (Reddit): keep only India/GCC-relevant posts."""
+    return pull(dc.REDDIT_FEEDS, type_of=lambda n: "reddit", geo_required=True)
 
 
 def dedup(rows, seen_ids):

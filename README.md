@@ -6,13 +6,31 @@ Tracks **data-center value-chain developments and partnerships across India + th
 | Tab | Source type | Status |
 |-----|-------------|--------|
 | **SS1 News** | journalists talk about them (RSS firehose) | ✅ live |
-| **SS2 Policy** | governments rule on them | 🚧 next |
-| **SS3 Disclosure** | they talk about themselves (SEC EDGAR + IR) | 🚧 next |
-| **SS4 OSINT** | footprints (jobs, Reddit, Adzuna) | 🚧 next |
-| **SS5 Ranked** | scored roll-up | 🚧 next |
+| **SS2 Policy** | governments rule on them (think-tanks + India/GCC gov feeds) | ✅ live |
+| **SS3 Disclosure** | they talk about themselves (SEC EDGAR full-text) | ✅ live |
+| **SS4 OSINT** | footprints (Reddit + Greenhouse/Lever/Adzuna jobs) | ✅ live (add ATS tokens / Adzuna key for volume) |
+| **SS5 Ranked** | scored roll-up over SS1–SS4 (BD Framework v3 weights) | ✅ live |
 
 All five worksheets live in **one** Google Sheet ("Datacentre"). Config-driven,
 runs entirely on GitHub Actions cron — no servers.
+
+Two scheduled jobs: `dc-news.yml` (SS1, ~every 3h) and `dc-pipeline.yml`
+(SS2–SS5, daily).
+
+## DC Hub MCP (live grid / facilities / M&A intelligence)
+
+[`dchub-mcp-server`](https://github.com/azmartone67/dchub-mcp-server) — 51 tools over
+21,000+ facilities + live grid telemetry + 2,000+ M&A deals. Enable it for this
+project to query DC intelligence interactively:
+
+```bash
+claude mcp add --transport http dchub https://dchub.cloud/mcp
+```
+
+Then: `/dchub:pick-a-market`, `/dchub:analyze-site`, etc. Free anonymous tier =
+10 calls/day; free key (`https://dchub.cloud/signup`) = 50/day. Note its *live grid*
+data is US/EU/AU/Taiwan — for India/GCC its value is facilities, M&A, and market intel.
+It's the upgrade path for automated SS4 grid/interconnection enrichment.
 
 ## Adding a source (the whole workflow)
 
