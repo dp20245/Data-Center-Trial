@@ -125,6 +125,28 @@ EDGAR_FORMS   = "8-K,6-K,10-K,20-F"
 EDGAR_GEO_TERMS = ['"data center" India', '"data center" UAE',
                    '"data center" "Saudi Arabia"', '"data center" Qatar',
                    '"data centre" India']
+# --- Evidence-extraction taxonomy (Sheet 7 pattern: find DC term near geo near action) ---
+# Geo terms reuse dc_ingest.GEO_KEYWORDS. These drive the evidence window + matched_terms.
+DC_TERMS = ["data center", "data centre", "datacenter", "datacentre",
+            "hyperscale", "colocation", "colo ", "server farm", "campus"]
+ACTION_TERMS = ["invest", "investment", "capex", "capital expenditure", "expand",
+                "expansion", "new facility", "facility", "plant", "construct",
+                "construction", "megawatt", " mw ", "partnership", "joint venture",
+                " jv ", "mou", "memorandum of understanding", "acquisition",
+                "acquire", "supply agreement", "capacity", "ground-break"]
+# Ordered: first match wins as deal_type (most specific first).
+DEAL_TYPE_TERMS = [
+    ("joint venture", "JV"), (" jv ", "JV"),
+    ("acquisition", "acquisition"), ("acquire", "acquisition"),
+    ("supply agreement", "supply-agreement"),
+    ("capital expenditure", "capex"), ("capex", "capex"),
+    ("partnership", "partnership"), ("mou", "partnership"),
+    ("memorandum of understanding", "partnership"),
+    ("expansion", "facility-expansion"), ("new facility", "facility-expansion"),
+    ("facility", "facility-expansion"), ("construction", "facility-expansion"),
+]
+EDGAR_EVIDENCE_WINDOW = 500   # chars: DC↔geo↔action proximity for "high" confidence
+EDGAR_MAX_DOCS = 25           # fetch+parse the N most-recent hits per run (perf cap)
 # Poll these CIKs' submissions feeds directly (data.sec.gov/submissions/CIK##########.json):
 EDGAR_CIKS = {
     "Equinix":        "0001101239",
@@ -156,8 +178,8 @@ LEVER_TOKENS = [
 #     country code -> search query. Broad India/GCC coverage.
 ADZUNA_QUERIES = {
     "in": "data centre engineer",
-    "ae": "data center technician",
-    # Adzuna supports: gb, us, in, ae ... (not all GCC). Use GNews jobs for the rest.
+    # Adzuna has NO GCC countries (ae/sa/qa all 404) — India only. ✅ verified: 'in'
+    # returns ~268 "data centre engineer" hits. GCC hiring signal needs another source.
 }
 # (c) Reddit subreddit RSS — free, no key.
 REDDIT_FEEDS = {

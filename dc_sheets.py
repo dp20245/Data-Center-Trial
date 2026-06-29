@@ -18,8 +18,9 @@ import dc_config as dc
 ARTICLE_HEADER = ["id", "date", "source", "layer", "geo", "title", "url",
                   "summary", "sentiment", "entities", "type", "event_id"]
 SS1_HEADER = ARTICLE_HEADER  # back-compat
-SS3_HEADER = ["accession", "filed_date", "filer", "cik", "form", "counterparty",
-              "counterparty_region", "deal_type", "layer", "excerpt", "url"]
+SS3_HEADER = ["accession", "filed_date", "filer", "cik", "form",
+              "counterparty_region", "deal_type", "layer", "matched_terms",
+              "confidence", "evidence", "url"]
 SS4_HEADER = ["id", "observed_date", "signal_type", "actor", "geo", "layer",
               "magnitude", "confidence", "url", "excerpt"]
 SS5_HEADER = ["company", "partner", "development_type", "layer", "geo", "score",
@@ -88,7 +89,7 @@ def append_ss3(ss, rows):
     if not rows:
         return 0
     ws = get_tab(ss, dc.SS3_DISCLOSE_TAB, SS3_HEADER)
-    grid = [[r[k] for k in SS3_HEADER] for r in rows]
+    grid = [[r.get(k, "") for k in SS3_HEADER] for r in rows]
     return _append(ws, grid)
 
 
