@@ -77,7 +77,41 @@ def main():
     a3 = dc_sheets.read_tab(sheet, dc.SS3_DISCLOSE_TAB)
     a4 = dc_sheets.read_tab(sheet, dc.SS4_OSINT_TAB)
     ranked = dc_score.rank(a1, a2, a3, a4)
+
+    # India entity spine: resolve SS5 operators against MCA (link SS5 by CIN) +
+    # a dictionary-NER pass over SS1/SS2/SS4 text to grow the spine. Enrichment,
+    # not a trigger (Sheet 7 rule): signals stay the driver via top_evidence_ids.
+    import dc_mca
+    cache = dc_mca.load_cache()
+    entities = {}
+
+    def _add(rec, src):
+        cur = entities.setdefault(rec["cin"], {**rec, "sources": ""})
+        srcs = set(filter(None, cur["sources"].split("; ")))
+        srcs.add(src)
+        cur["sources"] = "; ".join(sorted(srcs))
+
+    for r in ranked:                       # SS5 operators (primary)
+        rec = dc_mca.resolve(r["company"], cache)
+        r["cin"] = rec["cin"] if rec else ""
+        r["india_status"] = rec["status"] if rec else "unresolved"
+        if rec:
+            _add(rec, f"SS5:{r['company']}")
+
+    seen = {r["company"] for r in ranked}
+    for row in a1 + a2 + a4:               # NER-lite over signal text
+        text = f"{row.get('title', '')} {row.get('summary', '')} {row.get('actor', '')} {row.get('excerpt', '')}"
+        for org in dc_mca.extract_orgs(text):
+            if org in seen:
+                continue
+            seen.add(org)
+            rec = dc_mca.resolve(org, cache)
+            if rec:
+                _add(rec, f"NER:{org}")
+
+    dc_mca.save_cache(cache)
     print(f"  SS5 -> {dc_sheets.write_ss5(sheet, ranked)} ranked operators")
+    print(f"  Entities spine -> {dc_sheets.write_entities(sheet, list(entities.values()))} resolved")
 
 
 if __name__ == "__main__":

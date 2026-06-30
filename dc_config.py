@@ -262,3 +262,33 @@ SS2_POLICY_TAB  = "SS2 Policy"
 SS3_DISCLOSE_TAB = "SS3 Disclosure"
 SS4_OSINT_TAB   = "SS4 OSINT"
 SS5_RANKED_TAB  = "SS5 Ranked"
+ENTITIES_TAB    = "Entities"        # CIN-keyed India company spine; SS5 links by CIN
+
+# ===========================================================================
+# 9. MCA — India entity spine (data.gov.in OGD API). Enrichment, NOT a trigger.
+# ===========================================================================
+# Company Master Data: 4.06M companies, exact company_name match only (no fuzzy),
+# snapshot ~Dec-2024 (stale -> resolution good, fresh-incorporation signal weak).
+# Reads DATA_GOV_IN_API_KEY env. See dc_mca.py.
+MCA_API_BASE = "https://api.data.gov.in/resource/ec58dab7-d891-4abb-936e-d5d274a6ce9b"
+# Legal-suffix variants tried when the exact name is unknown (cheap, exact queries).
+MCA_NAME_SUFFIXES = [
+    "PRIVATE LIMITED", "LIMITED", "INDIA PRIVATE LIMITED",
+    "TECHNOLOGIES PRIVATE LIMITED", "TECHNOLOGIES LIMITED",
+    "DATA SERVICES PRIVATE LIMITED", "DATACENTERS PRIVATE LIMITED",
+    "DATA CENTRES PRIVATE LIMITED", "DATA LIMITED", "INFRA PRIVATE LIMITED",
+]
+# Verified exact legal names (✅ probed). Add one line per operator as resolved.
+MCA_ALIASES = {
+    "Sify":    "SIFY TECHNOLOGIES LIMITED",
+    "Equinix": "EQUINIX INDIA PRIVATE LIMITED",   # FTC = foreign subsidiary
+    "Nxtra":   "NXTRA DATA LIMITED",
+    # <-- ADD: "Operator": "EXACT MCA LEGAL NAME",
+}
+# Dictionary-NER gazetteer: known DC value-chain companies to spot in SS1-SS4 text
+# and resolve into the Entities spine (the "some NER" layer; spaCy NER is the upgrade).
+DC_COMPANY_GAZETTEER = sorted(set(WATCH_OPERATORS_INDIA + WATCH_OPERATORS_GCC + [
+    "Digital Realty", "Princeton Digital", "Web Werks", "Pi Datacenters", "ESDS",
+    "Tata Communications", "Reliance", "Nvidia", "AMD", "TSMC", "Vertiv",
+    "Schneider", "Microsoft", "Amazon", "Google", "Oracle", "Meta",
+]))

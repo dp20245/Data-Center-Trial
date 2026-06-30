@@ -23,9 +23,14 @@ SS3_HEADER = ["accession", "filed_date", "filer", "cik", "form",
               "confidence", "evidence", "url"]
 SS4_HEADER = ["id", "observed_date", "signal_type", "actor", "geo", "layer",
               "magnitude", "confidence", "url", "excerpt"]
-SS5_HEADER = ["company", "partner", "development_type", "layer", "geo", "score",
-              "momentum", "policy_tailwind", "india_gcc_relevance",
-              "partnership_strength", "last_signal", "top_evidence_ids"]
+SS5_HEADER = ["company", "cin", "india_status", "partner", "development_type",
+              "layer", "geo", "score", "momentum", "policy_tailwind",
+              "india_gcc_relevance", "partnership_strength", "last_signal",
+              "top_evidence_ids"]
+# CIN-keyed India company spine (Entities tab). SS5 links to it via `cin`.
+ENTITIES_HEADER = ["cin", "legal_name", "matched_as", "status", "ownership",
+                   "listed", "nic_class", "state", "inc_year", "company_class",
+                   "category", "paidup_capital", "roc", "sources"]
 
 
 def _retry(fn, *args, **kwargs):
@@ -119,6 +124,16 @@ def write_ss5(ss, rows):
     """Rebuild the SS5 ranked tab (one row per scored development)."""
     ws = get_tab(ss, dc.SS5_RANKED_TAB, SS5_HEADER)
     grid = [SS5_HEADER] + [[r.get(k, "") for k in SS5_HEADER] for r in rows]
+    _retry(ws.clear)
+    _retry(ws.update, "A1", grid, value_input_option="USER_ENTERED")
+    return len(rows)
+
+
+def write_entities(ss, records):
+    """Rebuild the CIN-keyed Entities spine tab (one row per resolved company)."""
+    ws = get_tab(ss, dc.ENTITIES_TAB, ENTITIES_HEADER)
+    rows = sorted(records, key=lambda r: r.get("legal_name", ""))
+    grid = [ENTITIES_HEADER] + [[r.get(k, "") for k in ENTITIES_HEADER] for r in rows]
     _retry(ws.clear)
     _retry(ws.update, "A1", grid, value_input_option="USER_ENTERED")
     return len(rows)
