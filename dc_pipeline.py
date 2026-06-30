@@ -113,6 +113,19 @@ def main():
     print(f"  SS5 -> {dc_sheets.write_ss5(sheet, ranked)} ranked operators")
     print(f"  Entities spine -> {dc_sheets.write_entities(sheet, list(entities.values()))} resolved")
 
+    # Dashboard (computed heatmaps, always-on) + AI Summary (Nemotron, grounded, cached).
+    # Both non-fatal: a failure here never breaks the SS1-SS5 pipeline.
+    import dc_dashboard
+    import dc_ai
+    tabs = {"ss1": a1, "ss2": a2, "ss3": a3, "ss4": a4,
+            "ss5": ranked, "entities": list(entities.values())}
+    try:
+        computed = dc_dashboard.compute(tabs)
+        print(f"  Dashboard -> {dc_dashboard.write(sheet, computed)} rows")
+        dc_ai.summarize(sheet, tabs, computed)
+    except Exception as e:
+        print(f"  [dashboard/ai] non-fatal error: {e}")
+
 
 if __name__ == "__main__":
     main()

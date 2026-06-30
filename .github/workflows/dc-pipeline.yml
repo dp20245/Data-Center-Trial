@@ -44,19 +44,20 @@ jobs:
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
           ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
           DATA_GOV_IN_API_KEY: ${{ secrets.DATA_GOV_IN_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           HF_HUB_DISABLE_TELEMETRY: "1"
         run: |
           set -o pipefail
           python dc_pipeline.py 2>&1 | tee run.log
 
-      - name: Commit MCA cache
+      - name: Commit caches
         run: |
           git config user.name  "dc-engine-bot"
           git config user.email "dc-engine-bot@users.noreply.github.com"
-          git add mca_cache.json
+          git add mca_cache.json ai_cache.json
           if git diff --staged --quiet; then
-            echo "No MCA cache change."
+            echo "No cache change."
           else
-            git commit -m "Update MCA cache [skip ci]"
+            git commit -m "Update caches [skip ci]"
             git pull --rebase && git push
           fi

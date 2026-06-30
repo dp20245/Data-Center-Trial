@@ -263,6 +263,18 @@ SS3_DISCLOSE_TAB = "SS3 Disclosure"
 SS4_OSINT_TAB   = "SS4 OSINT"
 SS5_RANKED_TAB  = "SS5 Ranked"
 ENTITIES_TAB    = "Entities"        # CIN-keyed India company spine; SS5 links by CIN
+DASHBOARD_TAB   = "Dashboard"       # computed heatmaps + whitespace + emphasis (no AI)
+AI_SUMMARY_TAB  = "AI Summary"      # Nemotron narrative, grounded + cached
+
+# ===========================================================================
+# 10. DASHBOARD + AI SUMMARY
+# ===========================================================================
+# Heatmap markets (country-level; matches the geo column values). Layers reuse LAYERS.
+MARKETS = ["India", "UAE", "Saudi Arabia", "Qatar", "Bahrain", "Kuwait", "Oman"]
+# OpenRouter (OpenAI-compatible). Free Nemotron, 1M context. Reads OPENROUTER_API_KEY.
+OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+DC_AI_MODEL     = "nvidia/nemotron-3-super-120b-a12b:free"
+AI_MAX_TOKENS   = 2200              # cap output to protect the daily budget (reasoning is OFF)
 
 # ===========================================================================
 # 9. MCA — India entity spine (data.gov.in OGD API). Enrichment, NOT a trigger.
