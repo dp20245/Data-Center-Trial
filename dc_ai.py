@@ -50,15 +50,19 @@ SYSTEM = (
     "- Indian policy items (SEBI, PIB, data-localization) are India government-affairs hooks; GCC "
     "policy matters only if it pushes a player toward India.\n"
     "- Hiring spikes or facility presence in Indian states signal India expansion before the news.\n\n"
-    "Sections:\n"
+    "Sections — keep the three READs to 2–4 SHORT lines each:\n"
     "GEOGRAPHICAL READ — where INDIA activity concentrates (states/layers) + the most India-"
     "relevant GCC movements.\n"
     "POLICY READ — India regulatory/policy tailwinds or risks that create a TAG government-affairs hook.\n"
     "COMMERCIAL READ — which value-chain layers and named operators are moving on/into India.\n"
-    "RANKED INDIA OPPORTUNITIES — the top BD plays FOR INDIA, highest-conviction first. For each: "
-    "company; why-now; cross-signal reasoning (e.g. active in GCC + no India entity => likely India "
-    "entry); TAG play (India market-entry / India government-affairs / India partnership / India "
-    "site-selection); evidence ids or CIN."
+    "RANKED INDIA OPPORTUNITIES — top BD plays FOR INDIA, highest-conviction first. Output ONLY "
+    "a pipe-delimited table, one opportunity PER LINE, with EXACTLY these five columns and no "
+    "others:\n"
+    "Rank | Company | Why-now | TAG play | Evidence\n"
+    "Rules: Why-now ≤10 words (the key cross-signal, e.g. 'GCC-active, no India entity'); "
+    "TAG play is one of India market-entry / India government-affairs / India partnership / India "
+    "site-selection; Evidence = ids or CIN. No prose, no header row, no blank cells, no extra "
+    "sentences before or after the table."
 )
 
 
@@ -223,12 +227,44 @@ def classify_tenders(candidates):
         return {}
 
 
+def _render(header, body):
+    """Reads render as single-cell text rows; RANKED INDIA OPPORTUNITIES renders as a
+    real pipe-split table. Degrades to plain text rows if the model emits no '|'."""
+    import re
+    rows = [[header], [""]]
+    in_table = False
+    for ln in (body or "").split("\n"):
+        if re.match(r"(?i)^\s*#*\s*RANKED INDIA OPPORTUNITIES", ln):
+            rows.append([ln.strip()])
+            rows.append(["Rank", "Company", "Why now", "TAG play", "Evidence"])
+            in_table = True
+            continue
+        if in_table and "|" in ln:
+            rows.append([c.strip() for c in ln.split("|")])
+        else:
+            rows.append([ln])            # reads + any non-pipe trailer (e.g. Grounding set)
+    w = max(len(r) for r in rows)
+    return [r + [""] * (w - len(r)) for r in rows]   # pad rectangular
+
+
+def _wrap_reqs(ss, ws, ncols):
+    sid = ws._properties["sheetId"]
+    return [{"repeatCell": {
+        "range": {"sheetId": sid, "startColumnIndex": 0, "endColumnIndex": ncols},
+        "cell": {"userEnteredFormat": {"wrapStrategy": "WRAP"}},
+        "fields": "userEnteredFormat.wrapStrategy"}}]
+
+
 def _write(ss, header, body):
     import dc_sheets
     ws = dc_sheets.get_tab(ss, dc.AI_SUMMARY_TAB, ["AI Summary"])
-    grid = [[header], [""]] + [[ln] for ln in (body or "").split("\n")]
+    grid = _render(header, body)
     dc_sheets._retry(ws.clear)
     dc_sheets._retry(ws.update, "A1", grid, value_input_option="RAW")
+    try:
+        dc_sheets._retry(ss.batch_update, {"requests": _wrap_reqs(ss, ws, len(grid[0]))})
+    except Exception as e:
+        print(f"  [ai] wrap formatting skipped: {e}")
 
 
 def summarize(ss, tabs, computed):
