@@ -94,11 +94,20 @@ def compile_context(tabs, c):
         L += ["", "WHITESPACE(GCC active, no India entity — market-entry targets):"]
         L += [f"  {w['company']} | {w['geo']} | score {w['score']}" for w in ws]
 
-    L += ["", "TOP PROSPECTS (SS5, top 5):"]
+    movers = [p for p in c.get("movers", []) if p.get("score_delta") == "new"
+              or (isinstance(p.get("score_delta"), (int, float)) and p["score_delta"] > 0)][:5]
+    if movers:
+        L += ["", "TOP MOVERS (Δ since last run — validate/refine the play):"]
+        for p in movers:
+            d = p.get("score_delta")
+            dtxt = "new" if d == "new" else f"+{d}"
+            L.append(f"  {p.get('company')} | Δ{dtxt} | {p.get('new_ev', 0)} new signals | {p.get('why_now', '')}")
+
+    L += ["", "TOP PROSPECTS (SS5, top 5 — deterministic play is a FLOOR you may override):"]
     for p in c.get("prospects", [])[:5]:
-        L.append(f"  {p.get('company')} | cin={p.get('cin')} | status={p.get('india_status')} "
-                 f"| score={p.get('score')} | layer={p.get('layer')} | geo={p.get('geo')} "
-                 f"| ev={p.get('top_evidence_ids')}")
+        L.append(f"  {p.get('company')} | {p.get('tier', '')} | play={p.get('tag_play', '')} "
+                 f"| status={p.get('india_status')} | score={p.get('score')} | geo={p.get('geo')} "
+                 f"| why={p.get('why_now', '')} | ev={p.get('top_evidence_ids')}")
 
     L += ["", "FILINGS SS3 (top 8):"]
     for r in tabs.get("ss3", [])[:8]:

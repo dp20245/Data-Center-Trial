@@ -6,9 +6,18 @@ targets, top prospects and areas of emphasis from SS1-SS5 + Entities. Heatmap NU
 are computed here (never AI-generated) and rendered with a color scale. compute()
 returns the structures so dc_ai reuses them as grounded context.
 """
+import os
+import json
+from collections import Counter
 from datetime import datetime, timezone
 
 import dc_config as dc
+
+TREND_PATH = os.path.join(os.path.dirname(__file__), "dc_trend.json")
+
+
+def _ts():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
 def _has(cell, token):
@@ -21,6 +30,51 @@ def _geo_of(row):
 
 def _split(cell):
     return [x.strip() for x in (cell or "").split(";") if x.strip()]
+
+
+def _ev_ids(p):
+    return [e.strip() for e in (p.get("top_evidence_ids") or "").split(",") if e.strip()]
+
+
+def _within(dstr, days):
+    try:
+        d = datetime.strptime((dstr or "")[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - d).days <= days
+    except Exception:
+        return False
+
+
+def _index(ss1, ss2, ss3, ss4):
+    """id/accession -> (url, date, kind) across all evidence tabs, for links + trend."""
+    url, date, kind = {}, {}, {}
+
+    def put(i, u, d, k):
+        if i:
+            url[i], date[i], kind[i] = u or "", (d or "")[:10], k
+
+    for r in ss1:
+        put(r.get("id"), r.get("url"), r.get("date"), "news")
+    for r in ss2:
+        put(r.get("id"), r.get("url"), r.get("date"), "policy")
+    for r in ss3:
+        put(r.get("accession"), r.get("url"), r.get("filed_date"), "filing")
+    for r in ss4:
+        put(r.get("id"), r.get("url"), r.get("observed_date"), r.get("signal_type") or "osint")
+    return url, date, kind
+
+
+def _load_trend():
+    try:
+        with open(TREND_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"operators": {}}
+
+
+def _save_trend(prospects):
+    ops = {p["company"]: {"score": p.get("score"), "ev_ids": _ev_ids(p)} for p in prospects}
+    with open(TREND_PATH, "w", encoding="utf-8") as f:
+        json.dump({"updated": _ts(), "operators": ops}, f, ensure_ascii=False, separators=(",", ":"))
 
 
 def compute(tabs):
@@ -55,28 +109,82 @@ def compute(tabs):
                     if l in comm_hm:
                         comm_hm[l][m] += 1
 
-    whitespace = [{"company": r["company"], "geo": r.get("geo", ""),
-                   "score": r.get("score", ""), "status": r.get("india_status", "")}
-                  for r in ss5
-                  if r.get("company") and r.get("india_status", "") in ("unresolved", "")]
+    # --- movement + actionable enrichment (per operator) ---
+    ev_url, ev_date, ev_kind = _index(ss1, ss2, ss3, ss4)
+    trend = _load_trend().get("operators", {})
+    gcc = [m for m in markets if m != "India"]
 
-    prospects = ss5[:10]
+    def _resolved(status):
+        return status not in ("unresolved", "", None)
+
+    def _tag_play(p):
+        geo, status = p.get("geo", ""), p.get("india_status", "")
+        in_gcc = any(_has(geo, m) for m in gcc)
+        if not _resolved(status) and in_gcc and not _has(geo, "India"):
+            return "India market-entry"
+        if _resolved(status) and (int(p.get("partnership_strength") or 0) > 0
+                                  or float(p.get("momentum") or 0) >= 3):  # ponytail: momentum≥3 = "high"
+            return "India partnership"
+        if int(p.get("policy_tailwind") or 0) > 0:
+            return "Govt-affairs hook"
+        return "Watch"
+
+    def _why_now(p, fresh):
+        if int(p.get("partnership_strength") or 0) > 0 and _within(p.get("last_signal", ""), 60):
+            return f"fresh filing {p.get('last_signal')}"
+        if fresh > 0:
+            return f"{fresh} new signals ≤7d"
+        if int(p.get("policy_tailwind") or 0) > 0:
+            return "policy activity"
+        return f"recent news {p.get('last_signal') or '—'}"
+
+    enriched = []
+    for r in ss5:
+        p = dict(r)
+        ids = _ev_ids(p)
+        fresh = sum(1 for i in ids if _within(ev_date.get(i, ""), 7))
+        kinds = Counter(ev_kind.get(i, "?") for i in ids)
+        p["signals"] = " · ".join(f"{n} {k}" for k, n in kinds.most_common()) or "—"
+        p["fresh_7d"] = fresh
+        p["link_url"] = next((ev_url[i] for i in ids if ev_url.get(i)), "")
+        p["tier"] = "T1" if float(p.get("score") or 0) >= 60 else "T2" if float(p.get("score") or 0) >= 40 else "T3"
+        p["tag_play"] = _tag_play(p)
+        p["why_now"] = _why_now(p, fresh)
+        pr = trend.get(p.get("company"))
+        if pr is None:
+            p["score_delta"], p["new_ev"] = "new", len(ids)
+        else:
+            p["score_delta"] = round(float(p.get("score") or 0) - float(pr.get("score") or 0), 1)
+            prev = set(pr.get("ev_ids", []))
+            p["new_ev"] = sum(1 for i in ids if i not in prev)
+        enriched.append(p)
+
+    whitespace = [p for p in enriched if p.get("company") and not _resolved(p.get("india_status", ""))]
+    prospects = enriched[:10]
+    movers = sorted(enriched,
+                    key=lambda p: p["score_delta"] if isinstance(p["score_delta"], (int, float)) else 999,
+                    reverse=True)
 
     def _total(m):
         return sum(geo_hm[m].values())
     hottest = max(markets, key=_total) if markets else ""
     hot_layer = max(layers, key=lambda l: geo_hm[hottest][l]) if hottest else ""
     policy_top = max(markets, key=lambda m: sum(policy_hm[m].values())) if markets else ""
-    mover = max(ss5, key=lambda r: float(r.get("momentum") or 0), default={})
+    top_mom = max(enriched, key=lambda r: float(r.get("momentum") or 0), default={})
+    mv = movers[0] if movers else {}
+    d = mv.get("score_delta")
+    dtxt = "new" if d == "new" else (f"+{d}" if isinstance(d, (int, float)) and d > 0 else str(d))
     emphasis = [
         f"Hottest market: {hottest} ({hot_layer}) — {_total(hottest)} signals",
         f"Whitespace / market-entry targets: {len(whitespace)} operators active with no India entity",
         f"Strongest policy tailwind: {policy_top} — {sum(policy_hm[policy_top].values())} items",
-        f"Top momentum: {mover.get('company', '—')} ({mover.get('momentum', '')})",
+        f"Top momentum: {top_mom.get('company', '—')} ({top_mom.get('momentum', '')})",
+        f"Top mover this run: {mv.get('company', '—')} ({dtxt} score, {mv.get('new_ev', 0)} new signals)",
     ]
     return {"markets": markets, "layers": layers, "ptypes": ptypes,
             "geo_hm": geo_hm, "policy_hm": policy_hm, "comm_hm": comm_hm,
-            "whitespace": whitespace, "prospects": prospects, "emphasis": emphasis}
+            "whitespace": whitespace, "prospects": prospects, "movers": movers,
+            "emphasis": emphasis}
 
 
 def _gradient_reqs(ss, ws, ranges):
@@ -134,16 +242,27 @@ def write(ss, c):
     heatmap("COMMERCIAL HEATMAP — filings+jobs+facilities by layer × market",
             c["layers"], c["markets"], lambda l, m: c["comm_hm"][l][m])
 
+    def _link(url):
+        u = (url or "").replace('"', "")
+        return f'=HYPERLINK("{u}","open")' if u else ""
+
+    def _delta(p):
+        d = p.get("score_delta")
+        return "new" if d == "new" else (f"+{d}" if isinstance(d, (int, float)) and d > 0 else str(d))
+
     add(["WHITESPACE — MARKET-ENTRY TARGETS (active in signals, no India entity)"])
-    add(["company", "geo", "score", "india_status"])
+    add(["company", "tag_play", "geo", "score", "why_now", "source"])
     for w in c["whitespace"]:
-        add([w["company"], w["geo"], w["score"], w["status"]])
+        add([w["company"], w.get("tag_play", ""), w.get("geo", ""), w.get("score", ""),
+             w.get("why_now", ""), _link(w.get("link_url"))])
     add()
-    add(["TOP PROSPECTS (SS5)"])
-    cols = ["company", "cin", "india_status", "score", "momentum", "last_signal", "top_evidence_ids"]
-    add(cols)
+    add(["TOP PROSPECTS (SS5) — tiered + actionable"])
+    add(["tier", "company", "tag_play", "score", "Δ", "new", "why_now", "signals",
+         "india_status", "last_signal", "source"])
     for p in c["prospects"]:
-        add([p.get(k, "") for k in cols])
+        add([p.get("tier", ""), p.get("company", ""), p.get("tag_play", ""), p.get("score", ""),
+             _delta(p), p.get("new_ev", ""), p.get("why_now", ""), p.get("signals", ""),
+             p.get("india_status", ""), p.get("last_signal", ""), _link(p.get("link_url"))])
 
     ws = dc_sheets.get_tab(ss, dc.DASHBOARD_TAB, ["Dashboard"])
     dc_sheets._retry(ws.clear)
@@ -154,4 +273,39 @@ def write(ss, c):
             dc_sheets._retry(ss.batch_update, {"requests": reqs})
     except Exception as e:
         print(f"  [dashboard] heatmap coloring skipped: {e}")
+    _save_trend(c["movers"])             # advance baseline (all operators) after a rendered run
     return len(grid)
+
+
+def _selfcheck():
+    """Offline check of tag_play routing + Δ math (no sheet, no network)."""
+    ss1 = [{"id": "n1", "url": "http://x/n1", "date": "2026-06-29", "title": "Khazna India push", "geo": "India", "layer": "Colo"}]
+    ss3 = [{"accession": "a1", "url": "http://x/a1", "filed_date": "2026-06-28", "filer": "Yotta", "counterparty_region": "India"}]
+    ss4 = [{"id": "j1", "url": "http://x/j1", "observed_date": "2026-06-27", "signal_type": "jobs", "actor": "Yotta", "geo": "India"}]
+    ss5 = [
+        {"company": "Khazna", "india_status": "unresolved", "geo": "UAE", "score": 55,
+         "momentum": 4, "partnership_strength": 0, "policy_tailwind": 0, "last_signal": "2026-06-29", "top_evidence_ids": "n1"},
+        {"company": "Yotta", "india_status": "active", "geo": "India", "score": 62,
+         "momentum": 5, "partnership_strength": 2, "policy_tailwind": 1, "last_signal": "2026-06-28", "top_evidence_ids": "a1, j1"},
+    ]
+    tabs = {"ss1": ss1, "ss2": [], "ss3": ss3, "ss4": ss4, "ss5": ss5, "entities": []}
+    global _load_trend
+    orig = _load_trend
+    _load_trend = lambda: {"operators": {"Yotta": {"score": 60, "ev_ids": ["a1"]}}}  # noqa: E731
+    try:
+        c = compute(tabs)
+    finally:
+        _load_trend = orig
+    by = {p["company"]: p for p in c["movers"]}
+    assert by["Khazna"]["tag_play"] == "India market-entry", by["Khazna"]["tag_play"]
+    assert by["Yotta"]["tag_play"] == "India partnership", by["Yotta"]["tag_play"]
+    assert by["Khazna"]["score_delta"] == "new", by["Khazna"]["score_delta"]
+    assert by["Yotta"]["score_delta"] == 2.0, by["Yotta"]["score_delta"]   # 62 - 60
+    assert by["Yotta"]["new_ev"] == 1, by["Yotta"]["new_ev"]               # j1 is new, a1 seen
+    assert by["Yotta"]["tier"] == "T1" and by["Khazna"]["tier"] == "T2"
+    assert by["Yotta"]["link_url"] == "http://x/a1", by["Yotta"]["link_url"]
+    print("dc_dashboard self-check: OK")
+
+
+if __name__ == "__main__":
+    _selfcheck()

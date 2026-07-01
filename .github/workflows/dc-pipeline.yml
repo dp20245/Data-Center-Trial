@@ -54,7 +54,7 @@ jobs:
         run: |
           git config user.name  "dc-engine-bot"
           git config user.email "dc-engine-bot@users.noreply.github.com"
-          git add mca_cache.json ai_cache.json
+          git add mca_cache.json ai_cache.json dc_trend.json
           if git diff --staged --quiet; then
             echo "No cache change."
           else
