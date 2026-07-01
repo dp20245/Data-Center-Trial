@@ -38,6 +38,8 @@ def _check(name, url, want="xml"):
             body = r.read(2000).decode("utf-8", "ignore").lstrip().lower()
         if want == "xml":
             ok = ("<rss" in body) or ("<feed" in body) or body.startswith("<?xml")
+        elif want == "html":
+            ok = ("<table" in body) or ("<tr" in body) or ("<html" in body) or ("<!doctype" in body)
         else:
             ok = body.startswith("{") or body.startswith("[")
         mark = "✅" if ok else "⚠️"
@@ -79,6 +81,19 @@ def main():
         live += _check(f"PeeringDB fac {geo}", url, want="json")
     total += 1
     live += _check("PeeringDB ix", dc.PEERINGDB_IX_URL, want="json")
+    total += 1
+    live += _check("CPPP tenders", dc.CPPP_TENDER_URL.format(page=1), want="html")
+    total += 1                                    # Overpass needs POST (GET 406s)
+    try:
+        q = '[out:json][timeout:25];area["ISO3166-1"="IN"]->.a;(nwr["telecom"="data_center"](area.a););out count;'
+        req = urllib.request.Request(dc.OVERPASS_URL, data=urllib.parse.urlencode({"data": q}).encode(),
+                                     headers={"User-Agent": "tag-dc-bot/1.0 (research)"})
+        with urllib.request.urlopen(req, timeout=45) as r:
+            ok = r.status == 200 and b"elements" in r.read(2000)
+        print(f"  {'✅' if ok else '❌'} OSM Overpass")
+        live += bool(ok)
+    except Exception as e:
+        print(f"  ❌ OSM Overpass ({e})")
     for token in dc.GREENHOUSE_TOKENS:
         total += 1
         live += _check(f"Greenhouse/{token}",

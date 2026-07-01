@@ -192,8 +192,26 @@ ADZUNA_QUERIES = {
 REDDIT_FEEDS = {
     "r/datacenter": "https://www.reddit.com/r/datacenter/.rss",
     "r/aws":        "https://www.reddit.com/r/aws/.rss",
+    "r/india":      "https://www.reddit.com/r/india/.rss",
+    "r/dubai":      "https://www.reddit.com/r/dubai/.rss",
+    "r/saudiarabia": "https://www.reddit.com/r/saudiarabia/.rss",
+    # search-as-feed (.rss form — feedparser-compatible; .json is not):
+    "r/datacenter?India": "https://www.reddit.com/r/datacenter/search.rss?q=India+colocation&restrict_sr=1&sort=new",
     # <-- ADD a subreddit: "r/name": "https://www.reddit.com/r/name/.rss",
 }
+# (c2) CPPP India tenders — auth-free "latest active tenders" listing (search form is
+#      CAPTCHA-walled; the ?page=N listing is not). Keyword pre-filter, then AI triage.
+#      signal_type=tender, confidence=med, geo=India. ✅ verified 2026-07-01.
+CPPP_TENDER_URL   = "https://eprocure.gov.in/cppp/latestactivetendersnew/cpppdata?page={page}"
+CPPP_TENDER_PAGES = 10           # ~10 rows/page => ~100 newest tenders scanned/day
+TENDER_KEYWORDS   = ["data cent", "colocation", "server farm", "cooling", "ups system",
+                     "it park", "hyperscale", "cloud data"]
+# (c3) OSM Overpass — free, no key (needs a real UA; default UA 406s). Building-centric
+#      facilities complement PeeringDB. India telecom=data_center is NOISY, so keep only
+#      building=data_center / operator-tagged / gazetteer-matched. signal_type=facility-presence, med.
+OVERPASS_URL = "https://overpass-api.de/api/interpreter"    # POST body data=<query> (GET 406s)
+OVERPASS_ISO = {"India": "IN", "UAE": "AE", "Saudi Arabia": "SA", "Qatar": "QA",
+                "Bahrain": "BH", "Kuwait": "KW", "Oman": "OM"}
 # (d) PeeringDB — free JSON, no key. Facility + internet-exchange presence (Network/Colo).
 #     ✅ verified: 245 India facs, 59 GCC facs, 54 IXs. Confirms PRESENCE, not a new
 #     development (signal_type=facility-presence, confidence=high). One-time census, then deduped.

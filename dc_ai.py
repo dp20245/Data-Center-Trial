@@ -154,11 +154,12 @@ def _clean(text):
     return (text[m.start():] if m else (text or "")).strip()
 
 
-def call_model(key, user):
+def _chat(key, system, user, max_tokens, temperature=0.2):
+    """Low-level OpenRouter chat call — reasoning OFF, returns raw content string."""
     body = json.dumps({
-        "model": dc.DC_AI_MODEL, "temperature": 0.2, "max_tokens": dc.AI_MAX_TOKENS,
+        "model": dc.DC_AI_MODEL, "temperature": temperature, "max_tokens": max_tokens,
         "reasoning": {"enabled": False},    # disable reasoning (not just hide it)
-        "messages": [{"role": "system", "content": SYSTEM},
+        "messages": [{"role": "system", "content": system},
                      {"role": "user", "content": user}],
     }).encode("utf-8")
     req = urllib.request.Request(
@@ -168,7 +169,58 @@ def call_model(key, user):
                  "X-Title": "Datacentre BI"})
     with urllib.request.urlopen(req, timeout=120) as r:
         d = json.loads(r.read().decode("utf-8", "ignore"))
-    return _clean(d["choices"][0]["message"]["content"])
+    return d["choices"][0]["message"]["content"]
+
+
+def call_model(key, user):
+    return _clean(_chat(key, SYSTEM, user, dc.AI_MAX_TOKENS))
+
+
+# --- tender triage: grounded classifier, keyword-pre-gated, non-fatal (dc_osint owns cache) ---
+CLASSIFY_SYSTEM = (
+    "detailed thinking off\n\n"
+    "You are a strict classifier for INDIAN GOVERNMENT DATA-CENTRE PROCUREMENT. For each "
+    "tender you get only a title and an organisation name. Use ONLY that text plus basic, "
+    "widely-known contextual inference (e.g. 'colocation'/'UPS'/'cooling'/'server farm'/"
+    "'hyperscale' relate to data centres). Do NOT use outside data; do NOT invent operators, "
+    "numbers, locations, or values. If a field is not stated or clearly inferable FROM THE "
+    "TEXT, return null for it.\n\n"
+    "is_dc = true ONLY if the tender is genuinely for a data-centre facility, colocation, or "
+    "its core infrastructure (power/cooling/UPS/server halls). Generic IT, plain networking "
+    "gear, or an unrelated 'server'/'relay' mention => false.\n\n"
+    "Output ONLY a JSON array, one object per input, no prose:\n"
+    '[{"id":"<id>","is_dc":true,"state":"<Indian state or null>","capacity_mw":<number or null>,'
+    '"value_inr":<number or null>,"layer":"<Compute|Cooling|Power|Network|Colo|Build or null>"}]'
+)
+
+
+def _json_array(text):
+    """Extract the first JSON array from possibly-wrapped model output."""
+    i, j = (text or "").find("["), (text or "").rfind("]")
+    return json.loads(text[i:j + 1]) if 0 <= i < j else []
+
+
+def classify_tenders(candidates):
+    """candidates: [{'id','title','org'}] -> {id: {is_dc,state,capacity_mw,value_inr,layer}}.
+    Returns {} on no-key / connection-fail / parse-fail (caller falls back to keyword-only)."""
+    if not candidates:
+        return {}
+    key = os.environ.get("OPENROUTER_API_KEY")
+    if not key:
+        return {}
+    ok, note, _ = test_connection(key)
+    if not ok:
+        print(f"  [tender-ai] skipped ({note})")
+        return {}
+    user = "Classify these tenders:\n" + "\n".join(
+        json.dumps({"id": c["id"], "title": c["title"], "org": c.get("org", "")}, ensure_ascii=False)
+        for c in candidates)
+    try:
+        arr = _json_array(_chat(key, CLASSIFY_SYSTEM, user, max_tokens=1500, temperature=0.0))
+        return {str(o["id"]): o for o in arr if isinstance(o, dict) and o.get("id") is not None}
+    except Exception as e:
+        print(f"  [tender-ai] {e}")
+        return {}
 
 
 def _write(ss, header, body):
