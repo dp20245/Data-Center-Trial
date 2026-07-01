@@ -64,12 +64,26 @@ jobs:
             git pull --rebase && git push
           fi
 
+      - name: Stamp code version
+        if: always()
+        run: |
+          {
+            echo "commit: $(git rev-parse HEAD)"
+            echo "ref:    ${{ github.ref_name }}"
+            echo "run:    ${{ github.run_number }} (${{ github.run_id }})"
+            echo "utc:    $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > RUN_VERSION.txt
+          # snapshot the exact code + config that produced this run
+          tar -czf code_snapshot.tar.gz *.py requirements.txt .github/workflows/dc-pipeline.yml
+
       - name: Upload run artifacts
-        if: always()                       # keep logs even when the pipeline fails
+        if: always()                       # keep logs/code even when the pipeline fails
         uses: actions/upload-artifact@v4
         with:
           name: dc-run-${{ github.run_number }}
           path: |
+            RUN_VERSION.txt
+            code_snapshot.tar.gz
             run.log
             ai_cache.json
             dc_trend.json
