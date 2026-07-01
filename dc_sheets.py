@@ -68,7 +68,10 @@ def get_tab(ss, title, header):
 
 def _append(ws, grid):
     if grid:
-        _retry(ws.append_rows, grid, value_input_option="USER_ENTERED",
+        # RAW, not USER_ENTERED: ingested data (dates like 2021-07-14, accessions like
+        # 0001171843-21-004865) must be stored verbatim — USER_ENTERED coerces them into
+        # date serials / arithmetic and corrupts the column.
+        _retry(ws.append_rows, grid, value_input_option="RAW",
                insert_data_option="INSERT_ROWS", table_range="A1")
     return len(grid)
 
