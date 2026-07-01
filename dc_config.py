@@ -292,7 +292,7 @@ MARKETS = ["India", "UAE", "Saudi Arabia", "Qatar", "Bahrain", "Kuwait", "Oman"]
 # OpenRouter (OpenAI-compatible). Free Nemotron, 1M context. Reads OPENROUTER_API_KEY.
 OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 DC_AI_MODEL     = "nvidia/nemotron-3-super-120b-a12b:free"
-AI_MAX_TOKENS   = 2200              # cap output to protect the daily budget (reasoning is OFF)
+AI_MAX_TOKENS   = 4000              # 11 per-company dossiers need room (reasoning is OFF; one call/run)
 
 # ===========================================================================
 # 9. MCA — India entity spine (data.gov.in OGD API). Enrichment, NOT a trigger.

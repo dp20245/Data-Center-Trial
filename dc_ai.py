@@ -27,8 +27,8 @@ CACHE_PATH = os.path.join(os.path.dirname(__file__), "ai_cache.json")
 
 SYSTEM = (
     "detailed thinking off\n\n"  # Nemotron switch: no chain-of-thought, answer directly
-    "Output ONLY the four sections below — no preamble, no meta-commentary, no 'we need to' "
-    "reasoning, no restating the task. Start directly with 'GEOGRAPHICAL READ'.\n\n"
+    "Output ONLY the sections below — no preamble, no meta-commentary, no 'we need to' "
+    "reasoning, no restating the task. Start directly with 'EXECUTIVE READ'.\n\n"
     "GROUNDING RULE: every company, number, deal, filing, and signal you mention MUST come from "
     "the spreadsheet DATA below — never invent or add ones that are not present. You MAY apply "
     "brief, widely-known background knowledge, but ONLY about entities that already appear in the "
@@ -38,31 +38,38 @@ SYSTEM = (
     "You are a business-development analyst for The Asia Group (TAG). TAG's core business is "
     "helping companies ENTER AND GROW IN INDIA — market entry, government affairs, partnerships, "
     "site selection. Convert this Datacentre intelligence into TAG's best INDIA opportunities. "
-    "Use ONLY the DATA provided below (TAG's India + GCC data-center sheet). Do NOT use outside "
-    "knowledge, memory, or assumptions. Every claim must cite a company, CIN, or tab/ids; if the "
-    "data does not support it, write 'not in data'. Be concise — short, specific bullets, and "
-    "name the company every time.\n\n"
+    "Use ONLY the DATA provided below. Do NOT use outside knowledge or assumptions. Name the "
+    "company every time and cite evidence ids or CIN.\n\n"
     "Lens — always reason toward an INDIA angle:\n"
-    "- A company active in the GCC with NO India entity (see WHITESPACE / Entities) is a prime "
-    "India MARKET-ENTRY target — flag it explicitly.\n"
+    "- A company active in the GCC with NO India entity is a prime India MARKET-ENTRY target.\n"
+    "- ownership=FTC/foreign-subsidiary means a foreign parent is ALREADY in India via a sub — "
+    "the parent is the market-GROWTH / partnership target; say so.\n"
     "- An India operator with rising momentum or a fresh filing/partnership is an India "
     "PARTNERSHIP or GOVERNMENT-AFFAIRS target.\n"
-    "- Indian policy items (SEBI, PIB, data-localization) are India government-affairs hooks; GCC "
-    "policy matters only if it pushes a player toward India.\n"
-    "- Hiring spikes or facility presence in Indian states signal India expansion before the news.\n\n"
-    "Sections — keep the three READs to 2–4 SHORT lines each:\n"
-    "GEOGRAPHICAL READ — where INDIA activity concentrates (states/layers) + the most India-"
-    "relevant GCC movements.\n"
-    "POLICY READ — India regulatory/policy tailwinds or risks that create a TAG government-affairs hook.\n"
-    "COMMERCIAL READ — which value-chain layers and named operators are moving on/into India.\n"
-    "RANKED INDIA OPPORTUNITIES — top BD plays FOR INDIA, highest-conviction first. Output ONLY "
-    "a pipe-delimited table, one opportunity PER LINE, with EXACTLY these five columns and no "
-    "others:\n"
-    "Rank | Company | Why-now | TAG play | Evidence\n"
-    "Rules: Why-now ≤10 words (the key cross-signal, e.g. 'GCC-active, no India entity'); "
-    "TAG play is one of India market-entry / India government-affairs / India partnership / India "
-    "site-selection; Evidence = ids or CIN. No prose, no header row, no blank cells, no extra "
-    "sentences before or after the table."
+    "- Indian policy items are India government-affairs hooks; GCC policy matters only if it "
+    "pushes a player toward India.\n"
+    "- Hiring spikes / facility presence / nearby government tenders in Indian states signal "
+    "India expansion before the news — connect them.\n\n"
+    "Produce EXACTLY these three sections:\n\n"
+    "EXECUTIVE READ — 3–5 short lines: where India activity concentrates (states/layers), the "
+    "top India policy hook, the value-chain layers/operators moving on India, and this run's top movers.\n\n"
+    "RANKING — a pipe-delimited table, a header row then ONE row per company, highest-conviction "
+    "first, EXACTLY these columns:\n"
+    "Rank | Company | Tier | Score Δ | India status | TAG play\n"
+    "(TAG play ∈ India market-entry / India government-affairs / India partnership / India "
+    "site-selection.) No prose around the table.\n\n"
+    "COMPANY DOSSIERS — one block per company in the DOSSIER DATA, using ONLY that company's "
+    "supplied facts. Format each block EXACTLY as:\n"
+    "━ <Legal name> (<CIN or 'no India entity'>) ━\n"
+    "Entity: <ownership/listed/inc_year/state/industry — or 'no India entity'>\n"
+    "Momentum: score <s> (Δ<d>) · <n> new signals ≤7d · tier <T>\n"
+    "Signals: <signal mix + layers + geo/states>\n"
+    "Why-now: <the sharpest cross-signal, one line>\n"
+    "TAG play: <play> — <one-line rationale>\n"
+    "Analysis: 2–4 sentences of grounded cross-signal reasoning (e.g. GCC-active + no India "
+    "entity => entry; foreign parent + rising momentum => scale the sub; hiring in a new state "
+    "=> site coming). Mark general background with [context].\n"
+    "Evidence: <ids or CIN>\n"
 )
 
 
@@ -85,53 +92,74 @@ def save_cache(c):
         json.dump(c, f, ensure_ascii=False, separators=(",", ":"))
 
 
+def _ev_index(tabs):
+    """id/accession -> a short evidence string, across every evidence tab (real text)."""
+    idx = {}
+    for r in tabs.get("ss1", []) + tabs.get("ss2", []):
+        if r.get("id"):
+            idx[r["id"]] = f"news/policy: {(r.get('title') or '')[:120]}"
+    for r in tabs.get("ss3", []):
+        if r.get("accession"):
+            idx[r["accession"]] = (f"filing {r.get('form', '')} "
+                                   f"[{r.get('deal_type', '')}/{r.get('counterparty_region', '')}]: "
+                                   f"{(r.get('evidence') or r.get('matched_terms') or '')[:150]}")
+    for r in tabs.get("ss4", []):
+        if r.get("id"):
+            idx[r["id"]] = f"{r.get('signal_type', '')}: {(r.get('excerpt') or r.get('actor') or '')[:120]}"
+    return idx
+
+
 def compile_context(tabs, c):
-    # ponytail: compressed to ~800 tokens; expand sections if model misses signals
+    # Brief global block for the EXECUTIVE READ + RANKING, then a deep per-company block.
     L = ["=== HEATMAPS ===",
          "Geo(market×layer): " + json.dumps(c["geo_hm"]),
          "Policy(market×type): " + json.dumps(c["policy_hm"]),
          "Commercial(layer×market): " + json.dumps(c["comm_hm"])]
     L += ["", "KEY SIGNALS:"] + c["emphasis"]
 
-    ws = c.get("whitespace", [])[:8]
-    if ws:
-        L += ["", "WHITESPACE(GCC active, no India entity — market-entry targets):"]
-        L += [f"  {w['company']} | {w['geo']} | score {w['score']}" for w in ws]
-
     movers = [p for p in c.get("movers", []) if p.get("score_delta") == "new"
               or (isinstance(p.get("score_delta"), (int, float)) and p["score_delta"] > 0)][:5]
     if movers:
-        L += ["", "TOP MOVERS (Δ since last run — validate/refine the play):"]
+        L += ["", "TOP MOVERS:"]
         for p in movers:
             d = p.get("score_delta")
             dtxt = "new" if d == "new" else f"+{d}"
             L.append(f"  {p.get('company')} | Δ{dtxt} | {p.get('new_ev', 0)} new signals | {p.get('why_now', '')}")
 
-    L += ["", "TOP PROSPECTS (SS5, top 5 — deterministic play is a FLOOR you may override):"]
-    for p in c.get("prospects", [])[:5]:
-        L.append(f"  {p.get('company')} | {p.get('tier', '')} | play={p.get('tag_play', '')} "
-                 f"| status={p.get('india_status')} | score={p.get('score')} | geo={p.get('geo')} "
-                 f"| why={p.get('why_now', '')} | ev={p.get('top_evidence_ids')}")
-
-    L += ["", "FILINGS SS3 (top 8):"]
-    for r in tabs.get("ss3", [])[:8]:
-        L.append(f"  {r.get('filer')} | {r.get('deal_type')} | {r.get('counterparty_region')} "
-                 f"| conf={r.get('confidence')} | terms={r.get('matched_terms')}")
-
     L += ["", "POLICY SS2:"]
     for r in tabs.get("ss2", [])[:12]:
         L.append(f"  {r.get('geo')} | {r.get('type')} | {r.get('title', '')[:100]}")
 
-    india_ents = [r for r in tabs.get("entities", []) if r.get("status") not in ("", None)]
-    if india_ents:
-        L += ["", "INDIA ENTITIES (resolved):"]
-        for r in india_ents[:10]:
-            L.append(f"  {r.get('legal_name')} | {r.get('cin')} | {r.get('status')} | {r.get('state')}")
-
     sig = Counter(r.get("signal_type") for r in tabs.get("ss4", []))
-    top_actors = Counter(r.get("actor") for r in tabs.get("ss4", []) if r.get("geo") in ("India", "IN"))
-    L += ["", f"OSINT SS4: {json.dumps(dict(sig))}",
-          f"Top India actors: {dict(top_actors.most_common(5))}"]
+    L += ["", f"OSINT SS4 mix: {json.dumps(dict(sig))}"]
+
+    # ---- deep per-company dossier data: 1 block per SS5 company (all 11) ----
+    ents = {r.get("cin"): r for r in tabs.get("entities", []) if r.get("cin")}
+    evidx = _ev_index(tabs)
+    companies = c.get("movers", [])                # full enriched SS5 set
+    L += ["", f"=== PER-COMPANY DOSSIER DATA ({len(companies)}) ==="]
+    for p in companies:
+        e = ents.get(p.get("cin"), {})
+        name = e.get("legal_name") or p.get("company")
+        d = p.get("score_delta")
+        dtxt = "new" if d == "new" else (f"+{d}" if isinstance(d, (int, float)) and d > 0 else str(d))
+        L.append(f"\n━ {name} ({p.get('cin') or 'no India entity'}) ━")
+        if e:
+            L.append(f"  entity: ownership={e.get('ownership', '?')} listed={e.get('listed', '?')} "
+                     f"inc_year={e.get('inc_year', '?')} state={e.get('state', '?')} "
+                     f"nic={e.get('nic_class', '?')} class={e.get('company_class', '?')} "
+                     f"paidup={e.get('paidup_capital', '?')} roc={e.get('roc', '?')}")
+        else:
+            L.append("  entity: no resolved India entity (MCA) — market-entry candidate")
+        L.append(f"  momentum: score={p.get('score')} Δ{dtxt} new≤7d={p.get('fresh_7d', 0)} "
+                 f"tier={p.get('tier')} momentum={p.get('momentum')} last={p.get('last_signal')}")
+        L.append(f"  profile: layers={p.get('layer')} geo={p.get('geo')} signals=[{p.get('signals', '')}] "
+                 f"filings={p.get('partnership_strength', 0)} policy={p.get('policy_tailwind', 0)} "
+                 f"status={p.get('india_status')} play={p.get('tag_play')}")
+        ids = [i.strip() for i in (p.get("top_evidence_ids") or "").split(",") if i.strip()]
+        ev = [f"    - [{i}] {evidx[i]}" for i in ids if i in evidx][:6]
+        if ev:
+            L += ["  evidence:"] + ev
 
     return "\n".join(L)
 
@@ -154,7 +182,7 @@ def test_connection(key):
 def _clean(text):
     """Nemotron can still leak chain-of-thought; keep from the first real section header."""
     import re
-    m = re.search(r"(?im)^\s*#*\s*GEOGRAPHICAL READ", text or "")
+    m = re.search(r"(?im)^\s*#*\s*EXECUTIVE READ", text or "")
     return (text[m.start():] if m else (text or "")).strip()
 
 
@@ -228,21 +256,11 @@ def classify_tenders(candidates):
 
 
 def _render(header, body):
-    """Reads render as single-cell text rows; RANKED INDIA OPPORTUNITIES renders as a
-    real pipe-split table. Degrades to plain text rows if the model emits no '|'."""
-    import re
+    """Any line with '|' → split into columns (the RANKING table); every other line →
+    one text cell (reads + dossier label lines). Pad rectangular. No special-casing."""
     rows = [[header], [""]]
-    in_table = False
     for ln in (body or "").split("\n"):
-        if re.match(r"(?i)^\s*#*\s*RANKED INDIA OPPORTUNITIES", ln):
-            rows.append([ln.strip()])
-            rows.append(["Rank", "Company", "Why now", "TAG play", "Evidence"])
-            in_table = True
-            continue
-        if in_table and "|" in ln:
-            rows.append([c.strip() for c in ln.split("|")])
-        else:
-            rows.append([ln])            # reads + any non-pipe trailer (e.g. Grounding set)
+        rows.append([c.strip() for c in ln.split("|")] if "|" in ln else [ln])
     w = max(len(r) for r in rows)
     return [r + [""] * (w - len(r)) for r in rows]   # pad rectangular
 
