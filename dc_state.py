@@ -30,7 +30,8 @@ def save(state):
 
 def _parse(ts):
     try:
-        return datetime.fromisoformat(ts)
+        d = datetime.fromisoformat(ts)
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)  # coerce naive -> aware
     except Exception:
         return datetime.now(timezone.utc)
 

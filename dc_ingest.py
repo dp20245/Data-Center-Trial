@@ -205,7 +205,13 @@ def fetch_newsdata():
                 link = a.get("link", "") or ""
                 if not title or not link:
                     continue
-                date = (a.get("pubDate", "") or "")[:10]
+                raw = (a.get("pubDate", "") or "").strip()
+                try:    # match the RSS tz-aware ISO convention (_published) — avoids
+                        # naive/aware compare crashes in downstream clustering
+                    date = datetime.strptime(raw, "%Y-%m-%d %H:%M:%S").replace(
+                        tzinfo=timezone.utc).isoformat()
+                except Exception:
+                    date = datetime.now(timezone.utc).isoformat()
                 if not _age_ok(date, dc.RECENT_MONTHS * 30):
                     continue
                 summary = _strip(a.get("description", "") or "")

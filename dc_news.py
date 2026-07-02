@@ -102,7 +102,9 @@ def main():
     elif new:
         import dc_sheets
         ss = dc_sheets.connect()
-        wrote = dc_sheets.append_ss1(ss, new)
+        seen = dc_sheets.dedup_existing(ss, dc.SS1_NEWS_TAB, [r["id"] for r in new])
+        fresh = [r for r in new if r["id"] not in seen]   # idempotent: never re-append (SS2-SS4 already do this)
+        wrote = dc_sheets.append_ss1(ss, fresh)
         print(f"  wrote {wrote} rows to '{dc.SS1_NEWS_TAB}'")
 
     ts = _now()
