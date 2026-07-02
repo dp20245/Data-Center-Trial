@@ -108,13 +108,25 @@ def _gnews_geo_hints():
     return hints
 
 
-def pull(feeds, geo_hints=None, type_of=None, geo_required=True):
+def _age_ok(datestr, max_age_days):
+    """True if the article is within the horizon (or the date is unparseable — keep)."""
+    try:
+        d = datetime.fromisoformat((datestr or "").replace("Z", "+00:00"))
+        if d.tzinfo is None:
+            d = d.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - d).days <= max_age_days
+    except Exception:
+        return True
+
+
+def pull(feeds, geo_hints=None, type_of=None, geo_required=True, max_age_days=None):
     """Generic RSS pull shared by SS1/SS2/SS4.
 
     feeds        : {name: url}
     geo_hints    : {name: country}  — fallback geo for already-scoped feeds
     type_of      : fn(name) -> type flag for the `type` column (else feed/gnews-geo)
     geo_required : drop items with no India/GCC signal (True for in-scope tabs)
+    max_age_days : if set, drop items older than this (the 6-month horizon); None = no cap
     """
     geo_hints = geo_hints or {}
     rows, health = [], {}
@@ -138,6 +150,8 @@ def pull(feeds, geo_hints=None, type_of=None, geo_required=True):
                 geos = tag_geo(text) or ([hint] if hint else [])
                 if geo_required and not geos:
                     continue
+                if max_age_days is not None and not _age_ok(_published(e), max_age_days):
+                    continue
                 layers = tag_layers(text)
                 rows.append({
                     "id": article_id(link),
@@ -159,9 +173,59 @@ def pull(feeds, geo_hints=None, type_of=None, geo_required=True):
 
 
 def fetch():
-    """SS1 News: specialist trade press + per-market Google News."""
+    """SS1 News: specialist trade press + per-market Google News + NewsData.io API."""
     feeds = {**dc.DC_NEWS_FEEDS, **dc.DC_GNEWS_GEO}
-    return pull(feeds, geo_hints=_gnews_geo_hints())
+    rows, health = pull(feeds, geo_hints=_gnews_geo_hints(),
+                        max_age_days=dc.RECENT_MONTHS * 30)
+    nd_rows, nd_health = fetch_newsdata()
+    return rows + nd_rows, {**health, **nd_health}
+
+
+def fetch_newsdata():
+    """SS1: NewsData.io India DC news (qInTitle + country=in). Non-fatal; [] if no key."""
+    import os
+    import json
+    import urllib.request
+    from urllib.parse import quote
+    key = os.environ.get("NEWSDATA_API_KEY")
+    if not key:
+        return [], {}
+    rows, health = [], {}
+    for q in dc.NEWSDATA_QUERIES:
+        try:
+            url = (f"{dc.NEWSDATA_URL}?apikey={key}&country=in&language=en"
+                   f"&qInTitle={quote(q)}")
+            req = urllib.request.Request(url, headers={"User-Agent": "tag-dc-bot/1.0"})
+            with urllib.request.urlopen(req, timeout=25) as r:
+                data = json.loads(r.read().decode("utf-8", "ignore"))
+            arts = data.get("results") or []
+            health[f"newsdata:{q}"] = len(arts)
+            for a in arts:
+                title = _strip(a.get("title", "") or "")
+                link = a.get("link", "") or ""
+                if not title or not link:
+                    continue
+                date = (a.get("pubDate", "") or "")[:10]
+                if not _age_ok(date, dc.RECENT_MONTHS * 30):
+                    continue
+                summary = _strip(a.get("description", "") or "")
+                text = f"{title} {summary}".lower()
+                layers = tag_layers(text)
+                geos = tag_geo(text) or ["India"]     # country=in guarantees India scope
+                rows.append({
+                    "id": article_id(link), "date": date,
+                    "source": a.get("source_id", "newsdata"),
+                    "layer": "; ".join(layers) if layers else "General",
+                    "geo": "; ".join(geos), "title": title,
+                    "url": clean_link(link), "summary": summary[:500],
+                    "type": "newsdata",
+                    "primary_layer": layers[0] if layers else "General",
+                    "text": f"{title}. {summary}"[:1000],
+                })
+        except Exception as exc:
+            health[f"newsdata:{q}"] = 0
+            print(f"  [newsdata error] {q}: {exc}")
+    return rows, health
 
 
 # Policy source -> type flag for SS2.
@@ -179,7 +243,8 @@ def fetch_policy():
              for n in dc.POLICY_GNEWS_GEO}
     hints = {n: {"Saudi": "Saudi Arabia"}.get(v, v) for n, v in hints.items()}
     return pull(feeds, geo_hints=hints,
-                type_of=lambda n: _POLICY_TYPE.get(n, "regulation"))
+                type_of=lambda n: _POLICY_TYPE.get(n, "regulation"),
+                max_age_days=dc.RECENT_MONTHS * 30)
 
 
 def fetch_reddit():

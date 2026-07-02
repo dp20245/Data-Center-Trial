@@ -31,6 +31,25 @@ DC_NEWS_FEEDS = {
     "PR Newswire Tech":      "https://www.prnewswire.com/rss/business-technology-latest-news/business-technology-latest-news-list.rss",
     "PR Newswire Energy":    "https://www.prnewswire.com/rss/energy-latest-news/energy-latest-news-list.rss",
     "GNews BusinessWire":    "https://news.google.com/rss/search?q=site:businesswire.com+%28%22data+center%22+OR+datacentre%29+%28India+OR+UAE+OR+Saudi+OR+Qatar+OR+GCC%29+when:7d&hl=en",
+    # --- ET Data Centers vertical (DC-native, India-aware; ✅ 10 feeds live 2026-07-02) ---
+    #     policy-land-power routes to SS2 (see DC_POLICY_FEEDS); the other 9 land here.
+    "ET DC Top":             "https://datacenters.economictimes.indiatimes.com/rss/topstories",
+    "ET DC Recent":          "https://datacenters.economictimes.indiatimes.com/rss/recentstories",
+    "ET DC Investments":     "https://datacenters.economictimes.indiatimes.com/rss/investments-deals",
+    "ET DC Cloud/Colo":      "https://datacenters.economictimes.indiatimes.com/rss/cloud-colocation-connectivity",
+    "ET DC AI/Compute":      "https://datacenters.economictimes.indiatimes.com/rss/ai-compute-infrastructure",
+    "ET DC Energy/Cooling":  "https://datacenters.economictimes.indiatimes.com/rss/energy-cooling-sustainability",
+    "ET DC Construction":    "https://datacenters.economictimes.indiatimes.com/rss/construction-site-development",
+    "ET DC Operations":      "https://datacenters.economictimes.indiatimes.com/rss/operations-resilience",
+    "ET DC Market Insights": "https://datacenters.economictimes.indiatimes.com/rss/market-insights-analysis",
+    # --- India publisher RSS (✅ verified 2026-07-02; geo/DC filter trims to India DC) ---
+    "ET Telecom":            "https://telecom.economictimes.indiatimes.com/rss/topstories",
+    "ETCIO":                 "https://cio.economictimes.indiatimes.com/rss/topstories",
+    "Moneycontrol Business": "https://www.moneycontrol.com/rss/business.xml",
+    # --- Foreign-hyperscaler investment discovery (GNews, NO when: — returns empty w/ it) ---
+    "GNews India Investment": "https://news.google.com/rss/search?q=India+data+center+investment&hl=en-IN&gl=IN&ceid=IN:en",
+    "GNews Foreign Players":  "https://news.google.com/rss/search?q=%28Blackstone+OR+AirTrunk+OR+G42+OR+Microsoft+OR+AWS+OR+Google+OR+Oracle+OR+CoreWeave+OR+%22Digital+Realty%22+OR+Brookfield%29+India+%28data+centre+OR+data+center%29&hl=en-IN&gl=IN&ceid=IN:en",
+    "GNews Hyperscale India": "https://news.google.com/rss/search?q=hyperscale+India+data+centre&hl=en-IN&gl=IN&ceid=IN:en",
     # <-- ADD A NEWS FEED: "Name": "https://.../feed",
     # Available but noisy (firehose): PRN all releases
     #   https://www.prnewswire.com/rss/news-releases-list.rss
@@ -67,6 +86,7 @@ LAYERS = {
         "nvidia", "amd", "tsmc", "broadcom", "gpu", "accelerator", "hbm",
         "wafer", "h100", "h200", "b200", "blackwell", "ai chip", "asic",
         "semiconductor", "fab", "foundry", "inference", "training cluster",
+        "cerebras", "supercomputer", "sovereign ai", "sovereign compute",
     ],
     "Cooling": [
         "vertiv", "liquid cooling", "immersion cooling", "immersion", "submer",
@@ -110,6 +130,13 @@ DC_POLICY_FEEDS = {
     "SEBI":                      "https://www.sebi.gov.in/sebirss.xml",
     "Boursa Kuwait":             "https://rss.boursakuwait.com.kw/rss/FeedFull.aspx",
     "Oman News Agency Economy":  "https://www.omannews.gov.om/rss.ona?rsslang=en&cat=80&limit=100",
+    # --- India DC policy (✅ verified 2026-07-02) ---
+    "ET DC Policy/Land/Power":   "https://datacenters.economictimes.indiatimes.com/rss/policy-land-power",
+    "MediaNama":                 "https://www.medianama.com/feed/",
+    "MediaNama Data Localisation": "https://www.medianama.com/tag/data-localisation/feed/",
+    "GNews India DC Policy":     "https://news.google.com/rss/search?q=India+data+centre+policy&hl=en-IN&gl=IN&ceid=IN:en",
+    "GNews Data Localisation":   "https://news.google.com/rss/search?q=data+localisation+India+DPDP&hl=en-IN&gl=IN&ceid=IN:en",
+    "GNews DC State Incentive":  "https://news.google.com/rss/search?q=India+data+centre+policy+state+incentive&hl=en-IN&gl=IN&ceid=IN:en",
     # QUARANTINED (auto-skipped at runtime, kept for memory):
     # "Qatar News Agency": "https://qna.org.qa/en/Pages/RSS-Feeds/Economy-Local",  # 404 (path dead)
     # "Bahrain News Agency": "https://api.bna.bh/rss/business",                    # 502 (server down)
@@ -166,6 +193,12 @@ IR_FEEDS = {
 # Named operators to watch via Google News, then confirm on their newsroom (SS3 evidence):
 WATCH_OPERATORS_INDIA = ["CtrlS", "Nxtra", "STT GDC India", "Yotta", "AdaniConneX", "Sify", "NTT"]
 WATCH_OPERATORS_GCC   = ["Khazna", "Moro Hub", "Gulf Data Hub", "center3", "EDGNEX", "Ooredoo"]
+# Non-Indian hyperscalers / investors building DC infra in India — the senior's #1 BD
+# target (foreign co entering/growing in India). Scored + flagged is_foreign in SS5.
+WATCH_OPERATORS_FOREIGN = ["Blackstone", "AirTrunk", "G42", "Microsoft", "AWS", "Amazon",
+                           "Google", "Meta", "Oracle", "CoreWeave", "Digital Realty",
+                           "Equinix", "Brookfield", "GIC", "Keppel", "Princeton Digital",
+                           "STACK Infrastructure", "Vantage", "EdgeConneX", "Colt", "RMZ"]
 
 # ===========================================================================
 # 6. SS4 — OSINT / LEADING INDICATORS
@@ -294,6 +327,14 @@ OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 DC_AI_MODEL     = "nvidia/nemotron-3-super-120b-a12b:free"
 AI_MAX_TOKENS   = 4000              # 11 per-company dossiers need room (reasoning is OFF; one call/run)
 
+# 6-month horizon (senior ask): code-side date cutoff for discovery feeds. Google News
+# `when:6m` silently returns empty, so we filter by article date instead.
+RECENT_MONTHS = 6
+# NewsData.io — India DC news (key via NEWSDATA_API_KEY secret; non-fatal if absent).
+# Use qInTitle (not q) + country=in for precision. ✅ verified 2026-07-02.
+NEWSDATA_URL     = "https://newsdata.io/api/1/latest"
+NEWSDATA_QUERIES = ["data centre", "colocation", "hyperscale"]
+
 # ===========================================================================
 # 9. MCA — India entity spine (data.gov.in OGD API). Enrichment, NOT a trigger.
 # ===========================================================================
@@ -321,4 +362,4 @@ DC_COMPANY_GAZETTEER = sorted(set(WATCH_OPERATORS_INDIA + WATCH_OPERATORS_GCC + 
     "Digital Realty", "Princeton Digital", "Web Werks", "Pi Datacenters", "ESDS",
     "Tata Communications", "Reliance", "Nvidia", "AMD", "TSMC", "Vertiv",
     "Schneider", "Microsoft", "Amazon", "Google", "Oracle", "Meta",
-]))
+] + WATCH_OPERATORS_FOREIGN))

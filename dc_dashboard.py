@@ -181,6 +181,12 @@ def compute(tabs):
         f"Top momentum: {top_mom.get('company', '—')} ({top_mom.get('momentum', '')})",
         f"Top mover this run: {mv.get('company', '—')} ({dtxt} score, {mv.get('new_ev', 0)} new signals)",
     ]
+    foreign = [p for p in enriched if p.get("is_foreign")]
+    if foreign:
+        tf = max(foreign, key=lambda p: float(p.get("score") or 0))
+        sz = f" · {tf['deal_value']}" if tf.get("deal_value") else ""
+        emphasis.append(f"Foreign hyperscalers active on India: {len(foreign)} "
+                        f"(top {tf.get('company', '—')}{sz})")
     return {"markets": markets, "layers": layers, "ptypes": ptypes,
             "geo_hm": geo_hm, "policy_hm": policy_hm, "comm_hm": comm_hm,
             "whitespace": whitespace, "prospects": prospects, "movers": movers,

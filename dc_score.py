@@ -11,8 +11,20 @@ from datetime import datetime, timezone
 
 import dc_config as dc
 
-OPERATORS = dc.WATCH_OPERATORS_INDIA + dc.WATCH_OPERATORS_GCC
+OPERATORS = dc.WATCH_OPERATORS_INDIA + dc.WATCH_OPERATORS_GCC + dc.WATCH_OPERATORS_FOREIGN
+_FOREIGN = {o.lower() for o in dc.WATCH_OPERATORS_FOREIGN}
 WEIGHTS = {"momentum": 0.35, "policy": 0.20, "geo": 0.25, "partner": 0.20}
+
+# Deal-size capture for big-ticket foreign investment (deterministic, headline-led).
+_MONEY = re.compile(
+    r'(?:US\$|\$|₹|Rs\.?|INR|USD)\s?[\d,.]+\s?(?:billion|bn|trillion|tn|crore|cr|million|mn|lakh)?'
+    r'|[\d,.]+\s?(?:billion|bn|crore|cr|trillion|million|mn|lakh)',
+    re.I)
+
+
+def _deal_value(text):
+    m = _MONEY.search(text or "")
+    return m.group(0).strip() if m else ""
 
 
 def _parse(d):
@@ -44,10 +56,12 @@ def rank(ss1, ss2, ss3, ss4):
     for op in OPERATORS:
         ev, momentum, policy, partner = [], 0.0, 0, 0
         geos, layers, last = set(), set(), ""
+        hits = []                                     # matched text for deal-size capture
 
         for r in ss1 + ss2:  # article schema
             if _mentions(op, r.get("title"), r.get("summary")):
                 ev.append(r.get("id", ""))
+                hits.append(f"{r.get('title', '')} {r.get('summary', '')}")
                 w = _recency(r.get("date", ""))
                 if r in ss2:
                     policy += 1
@@ -61,12 +75,14 @@ def rank(ss1, ss2, ss3, ss4):
         for r in ss3:  # filings
             if _mentions(op, r.get("filer"), r.get("counterparty")):
                 ev.append(r.get("accession", ""))
+                hits.append(r.get("evidence", "") or "")
                 momentum += _recency(r.get("filed_date", ""))
                 partner += 1
                 last = max(last, r.get("filed_date", "")[:10])
         for r in ss4:  # OSINT
             if _mentions(op, r.get("actor"), r.get("excerpt")):
                 ev.append(r.get("id", ""))
+                hits.append(r.get("excerpt", "") or "")
                 momentum += _recency(r.get("observed_date", ""))
                 if r.get("geo"):
                     geos.update(g.strip() for g in r["geo"].split(";"))
@@ -95,6 +111,8 @@ def rank(ss1, ss2, ss3, ss4):
             "partnership_strength": partner,
             "last_signal": last,
             "top_evidence_ids": ", ".join(e for e in ev[:8] if e),
+            "is_foreign": op.lower() in _FOREIGN,       # non-Indian hyperscaler/investor
+            "deal_value": _deal_value(" ".join(hits)),  # big-ticket size, if named
         })
     out.sort(key=lambda r: r["score"], reverse=True)
     return out

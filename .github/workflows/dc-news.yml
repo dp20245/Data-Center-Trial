@@ -40,6 +40,7 @@ jobs:
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           DC_SPREADSHEET_ID: ${{ secrets.DC_SPREADSHEET_ID }}
+          NEWSDATA_API_KEY: ${{ secrets.NEWSDATA_API_KEY }}
           HF_HUB_DISABLE_TELEMETRY: "1"
         run: |
           set -o pipefail
