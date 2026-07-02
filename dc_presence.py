@@ -13,9 +13,31 @@ Presence is proven, not assumed: real India facility rows (PeeringDB/OSM), a cur
 KNOWN_INDIA_PLAYERS list, or an MCA match with India geo => established. The manual
 `Entity Overrides` tab always wins (human-in-the-loop truth).
 """
+import os
+import json
+import hashlib
+
 import dc_config as dc
 
 _KNOWN = {k.lower() for k in dc.KNOWN_INDIA_PLAYERS}
+PRESENCE_CACHE = os.path.join(os.path.dirname(__file__), "presence_cache.json")
+
+# AI adjudication — ONLY for ambiguous residual (unknown/no_known_presence). Deterministic
+# proven cases (facility row / known list / manual override) are never sent and never
+# overridden. Strictly grounded on the supplied evidence; cached; non-fatal.
+_ADJUDICATE_SYS = (
+    "detailed thinking off\n\n"
+    "Classify a company's DATA-CENTER presence in INDIA using ONLY the evidence snippets "
+    "given for it — no outside knowledge, no invented facts.\n"
+    "india_presence: established (operates/owns DCs in India NOW) | announced (a plan/deal, "
+    "not yet operational) | no_known_presence (India-relevant but nothing built/announced) | "
+    "unknown (insufficient evidence).\n"
+    "expansion_stage: entry | scaling | partnership | policy_issue | monitor.\n"
+    "NEVER output 'established' without explicit evidence of operating DCs in India; when the "
+    "evidence is thin use unknown + low.\n"
+    "Output ONLY a JSON array: "
+    '[{"company":"..","india_presence":"..","expansion_stage":"..","confidence":"high|med|low"}]'
+)
 _OVERRIDE_KEYS = ("entity_match", "india_presence", "expansion_stage",
                   "presence_evidence_url", "verified_date")
 
@@ -82,6 +104,55 @@ def classify(row, ss4, overrides):
     return out
 
 
+def _load_presence_cache():
+    try:
+        with open(PRESENCE_CACHE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_presence_cache(c):
+    with open(PRESENCE_CACHE, "w", encoding="utf-8") as f:
+        json.dump(c, f, ensure_ascii=False, separators=(",", ":"))
+
+
+def ai_adjudicate(rows, evidence_by_company):
+    """Grounded AI presence call for AMBIGUOUS rows only. rows: ranked dicts;
+    evidence_by_company: {company: [snippets]}. Returns {company: verdict}; {} on any
+    failure (caller keeps the deterministic value). Cached by company + evidence hash."""
+    import dc_ai
+    cache = _load_presence_cache()
+    todo = []
+    for r in rows:
+        co = r.get("company", "")
+        ev = evidence_by_company.get(co, [])
+        h = hashlib.sha1("|".join(ev).encode("utf-8")).hexdigest()[:12]
+        if not (cache.get(co) or {}).get("h") == h:
+            todo.append((co, ev, h))
+    if todo:
+        key = os.environ.get("OPENROUTER_API_KEY")
+        if key:
+            ok, _, _ = dc_ai.test_connection(key)
+            if ok:
+                user = "Classify:\n" + "\n".join(
+                    json.dumps({"company": co, "evidence": ev[:6]}, ensure_ascii=False)
+                    for co, ev, _h in todo)
+                try:
+                    arr = dc_ai._json_array(dc_ai._chat(key, _ADJUDICATE_SYS, user, 1200, 0.0))
+                    byco = {o.get("company"): o for o in arr if isinstance(o, dict)}
+                    for co, ev, h in todo:
+                        o = byco.get(co)
+                        if o:
+                            cache[co] = {"h": h, "india_presence": o.get("india_presence"),
+                                         "expansion_stage": o.get("expansion_stage"),
+                                         "confidence": o.get("confidence")}
+                    _save_presence_cache(cache)
+                except Exception as e:
+                    print(f"  [presence-ai] {e}")
+    return {r.get("company"): cache[r["company"]] for r in rows if r.get("company") in cache}
+
+
 def _selfcheck():
     ss4 = [{"signal_type": "facility-presence", "actor": "CtrlS", "geo": "India",
             "url": "http://x/f1", "observed_date": "2026-06-01"}]
@@ -102,6 +173,9 @@ def _selfcheck():
                    load_overrides([{"company": "AWS", "india_presence": "established",
                                     "expansion_stage": "scaling"}]))
     assert ovr["india_presence"] == "established", ovr
+    # ai_adjudicate is non-fatal without a key (deterministic value stands)
+    os.environ.pop("OPENROUTER_API_KEY", None)
+    assert ai_adjudicate([{"company": "X", "top_evidence_ids": ""}], {"X": []}) == {}
     print("dc_presence self-check: OK")
 
 

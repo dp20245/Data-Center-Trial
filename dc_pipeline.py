@@ -127,6 +127,33 @@ def main():
     for r in ranked:
         r.update(dc_presence.classify(r, a4, overrides))
 
+    # AI adjudicates ONLY the ambiguous residual (deterministic proven cases untouched):
+    # grounded on each company's evidence, one cached call, non-fatal.
+    amb = [r for r in ranked if r.get("india_presence") in ("unknown", "no_known_presence")
+           and r.get("company", "").lower() not in overrides]
+    if amb:
+        import dc_ai
+        evidx = dc_ai._ev_index({"ss1": a1, "ss2": a2, "ss3": a3, "ss4": a4})
+        ev_by = {}
+        for r in amb:
+            ids = [i.strip() for i in (r.get("top_evidence_ids") or "").split(",") if i.strip()]
+            ev_by[r["company"]] = [evidx[i] for i in ids if i in evidx][:6]
+        try:
+            verdicts = dc_presence.ai_adjudicate(amb, ev_by)
+        except Exception as e:
+            print(f"  [presence-ai] {e}")
+            verdicts = {}
+        applied = 0
+        for r in amb:
+            v = verdicts.get(r["company"]) or {}
+            if v.get("confidence") in ("high", "med") and v.get("india_presence"):
+                r["india_presence"] = v["india_presence"]
+                if v.get("expansion_stage"):
+                    r["expansion_stage"] = v["expansion_stage"]
+                r["presence_source"] = "ai"
+                applied += 1
+        print(f"  Presence AI adjudicated -> {applied}/{len(amb)} ambiguous")
+
     print(f"  SS5 -> {dc_sheets.write_ss5(sheet, ranked)} ranked operators")
     print(f"  Entities spine -> {dc_sheets.write_entities(sheet, list(entities.values()))} resolved")
 

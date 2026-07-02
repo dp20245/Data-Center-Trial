@@ -50,7 +50,8 @@ SYSTEM = (
     "Follow expansion_stage (entry/scaling/partnership/policy_issue/monitor) for the TAG play. "
     "Foreign-flagged companies + the FOREIGN HYPERSCALER MOVES digest outrank domestic operators.\n\n"
     "Lens — always reason toward an INDIA angle:\n"
-    "- A company active in the GCC with NO India entity is a prime India MARKET-ENTRY target.\n"
+    "- Decide entry vs expansion by india_presence (NOT by a missing MCA entity): "
+    "announced/no_known_presence + a deal => market-ENTRY; established => EXPANSION.\n"
     "- ownership=FTC/foreign-subsidiary means a foreign parent is ALREADY in India via a sub — "
     "the parent is the market-GROWTH / partnership target; say so.\n"
     "- An India operator with rising momentum or a fresh filing/partnership is an India "
@@ -80,7 +81,7 @@ SYSTEM = (
     "Momentum = score, Δ, new≤7d, tier; Signals = signal mix + layers + geo/states; "
     "Why-now = the sharpest cross-signal; TAG play = play + one-line rationale; "
     "Analysis = 2–4 grounded cross-signal sentences (foreign parent + rising momentum => scale "
-    "the sub; GCC-active + no India entity => entry; hiring in a new state => site coming; mark "
+    "the sub; announced/no-known-presence + a deal => entry; hiring in a new state => site coming; mark "
     "general background with [context]); Evidence = the ids/CIN backing this company's row. "
     "No prose around the table.\n"
 )
@@ -164,14 +165,15 @@ def compile_context(tabs, c):
         name = e.get("legal_name") or p.get("company")
         d = p.get("score_delta")
         dtxt = "new" if d == "new" else (f"+{d}" if isinstance(d, (int, float)) and d > 0 else str(d))
-        L.append(f"\n━ {name} ({p.get('cin') or 'no India entity'}) ━")
+        L.append(f"\n━ {name} ({p.get('cin') or 'no MCA CIN'}) ━")
         if e:
             L.append(f"  entity: ownership={e.get('ownership', '?')} listed={e.get('listed', '?')} "
                      f"inc_year={e.get('inc_year', '?')} state={e.get('state', '?')} "
                      f"nic={e.get('nic_class', '?')} class={e.get('company_class', '?')} "
                      f"paidup={e.get('paidup_capital', '?')} roc={e.get('roc', '?')}")
         else:
-            L.append("  entity: no resolved India entity (MCA) — market-entry candidate")
+            L.append("  entity: no MCA entity record (often a foreign parent) — presence is "
+                     "decided by india_presence below, NOT by the missing MCA match")
         L.append(f"  momentum: score={p.get('score')} Δ{dtxt} new≤7d={p.get('fresh_7d', 0)} "
                  f"tier={p.get('tier')} momentum={p.get('momentum')} last={p.get('last_signal')}")
         L.append(f"  profile: layers={p.get('layer')} geo={p.get('geo')} signals=[{p.get('signals', '')}] "
