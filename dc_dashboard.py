@@ -7,6 +7,7 @@ are computed here (never AI-generated) and rendered with a color scale. compute(
 returns the structures so dc_ai reuses them as grounded context.
 """
 import os
+import re
 import json
 from collections import Counter
 from datetime import datetime, timezone
@@ -74,7 +75,29 @@ def _load_trend():
 def _save_trend(prospects):
     ops = {p["company"]: {"score": p.get("score"), "ev_ids": _ev_ids(p)} for p in prospects}
     with open(TREND_PATH, "w", encoding="utf-8") as f:
-        json.dump({"updated": _ts(), "operators": ops}, f, ensure_ascii=False, separators=(",", ":"))
+        json.dump({"updated": _ts(), "version": dc.SCORING_VERSION, "operators": ops},
+                  f, ensure_ascii=False, separators=(",", ":"))
+
+
+def _score_why(p):
+    """Break the Signal Score into its four weighted point-contributions (sums to score)."""
+    import dc_score
+    W = dc_score.WEIGHTS
+    mom = float(p.get("momentum") or 0)
+    pol = int(p.get("policy_tailwind") or 0)
+    par = int(p.get("partnership_strength") or 0)
+    geo = 1.0 if "india" in (p.get("geo") or "").lower() else (0.5 if p.get("geo") else 0.0)
+    m = 100 * W["momentum"] * min(mom, 10) / 10
+    g = 100 * W["geo"] * geo
+    d = 100 * W["partner"] * min(par, 5) / 5
+    po = 100 * W["policy"] * min(pol, 5) / 5
+    gtag = "IN" if geo == 1.0 else "GCC" if geo else "—"
+    s = f"momentum {mom:.1f}→{m:.0f} · geo {gtag}→{g:.0f} · {par} deals→{d:.0f} · {pol} policy→{po:.0f}"
+    if p.get("is_foreign"):
+        s += " · foreign"
+    if p.get("deal_value"):
+        s += f" · {p['deal_value']}"
+    return s
 
 
 def compute(tabs):
@@ -111,19 +134,30 @@ def compute(tabs):
 
     # --- movement + actionable enrichment (per operator) ---
     ev_url, ev_date, ev_kind = _index(ss1, ss2, ss3, ss4)
-    trend = _load_trend().get("operators", {})
+    trend_all = _load_trend()
+    trend = trend_all.get("operators", {})
+    version_reset = trend_all.get("version") != dc.SCORING_VERSION   # formula changed -> reset Δ
     gcc = [m for m in markets if m != "India"]
 
     def _resolved(status):
         return status not in ("unresolved", "", None)
 
+    # TAG play now derives from expansion_stage (dc_presence) — NOT "no MCA match = entry",
+    # which mislabeled established players. Falls back to the old rule only if stage absent.
+    _STAGE_PLAY = {"entry": "India market-entry", "scaling": "India expansion",
+                   "partnership": "India partnership", "policy_issue": "Govt-affairs hook",
+                   "monitor": "Watch"}
+
     def _tag_play(p):
-        geo, status = p.get("geo", ""), p.get("india_status", "")
+        st = p.get("expansion_stage")
+        if st in _STAGE_PLAY:
+            return _STAGE_PLAY[st]
+        geo, status = p.get("geo", ""), p.get("india_status", "")   # fallback (no presence data)
         in_gcc = any(_has(geo, m) for m in gcc)
         if not _resolved(status) and in_gcc and not _has(geo, "India"):
             return "India market-entry"
         if _resolved(status) and (int(p.get("partnership_strength") or 0) > 0
-                                  or float(p.get("momentum") or 0) >= 3):  # ponytail: momentum≥3 = "high"
+                                  or float(p.get("momentum") or 0) >= 3):
             return "India partnership"
         if int(p.get("policy_tailwind") or 0) > 0:
             return "Govt-affairs hook"
@@ -151,7 +185,9 @@ def compute(tabs):
         p["tag_play"] = _tag_play(p)
         p["why_now"] = _why_now(p, fresh)
         pr = trend.get(p.get("company"))
-        if pr is None:
+        if version_reset:
+            p["score_delta"], p["new_ev"] = "reset", len(ids)
+        elif pr is None:
             p["score_delta"], p["new_ev"] = "new", len(ids)
         else:
             p["score_delta"] = round(float(p.get("score") or 0) - float(pr.get("score") or 0), 1)
@@ -159,7 +195,13 @@ def compute(tabs):
             p["new_ev"] = sum(1 for i in ids if i not in prev)
         enriched.append(p)
 
-    whitespace = [p for p in enriched if p.get("company") and not _resolved(p.get("india_status", ""))]
+    def _is_whitespace(p):
+        pres = p.get("india_presence")
+        if pres:                               # presence known: not-yet-established = target
+            return pres in ("announced", "no_known_presence", "unknown")
+        return not _resolved(p.get("india_status", ""))   # fallback (no presence data)
+
+    whitespace = [p for p in enriched if p.get("company") and _is_whitespace(p)]
     prospects = enriched[:10]
     movers = sorted(enriched,
                     key=lambda p: p["score_delta"] if isinstance(p["score_delta"], (int, float)) else 999,
@@ -171,15 +213,21 @@ def compute(tabs):
     hot_layer = max(layers, key=lambda l: geo_hm[hottest][l]) if hottest else ""
     policy_top = max(markets, key=lambda m: sum(policy_hm[m].values())) if markets else ""
     top_mom = max(enriched, key=lambda r: float(r.get("momentum") or 0), default={})
-    mv = movers[0] if movers else {}
-    d = mv.get("score_delta")
-    dtxt = "new" if d == "new" else (f"+{d}" if isinstance(d, (int, float)) and d > 0 else str(d))
+    real_movers = [p for p in movers
+                   if isinstance(p.get("score_delta"), (int, float)) and p["score_delta"] != 0]
+    if real_movers:
+        mv = real_movers[0]
+        d = mv["score_delta"]
+        mover_line = (f"Top mover this run: {mv.get('company', '—')} "
+                      f"({'+' if d > 0 else ''}{d} score, {mv.get('new_ev', 0)} new signals)")
+    else:
+        mover_line = "No material mover this run (scores flat / new / baseline reset)"
     emphasis = [
         f"Hottest market: {hottest} ({hot_layer}) — {_total(hottest)} signals",
-        f"Whitespace / market-entry targets: {len(whitespace)} operators active with no India entity",
+        f"Whitespace (not-yet-established India targets): {len(whitespace)} operators",
         f"Strongest policy tailwind: {policy_top} — {sum(policy_hm[policy_top].values())} items",
         f"Top momentum: {top_mom.get('company', '—')} ({top_mom.get('momentum', '')})",
-        f"Top mover this run: {mv.get('company', '—')} ({dtxt} score, {mv.get('new_ev', 0)} new signals)",
+        mover_line,
     ]
     foreign = [p for p in enriched if p.get("is_foreign")]
     if foreign:
@@ -256,19 +304,21 @@ def write(ss, c):
         d = p.get("score_delta")
         return "new" if d == "new" else (f"+{d}" if isinstance(d, (int, float)) and d > 0 else str(d))
 
-    add(["WHITESPACE — MARKET-ENTRY TARGETS (active in signals, no India entity)"])
-    add(["company", "tag_play", "geo", "score", "why_now", "source"])
+    add(["WHITESPACE — NOT-YET-ESTABLISHED INDIA TARGETS"])
+    add(["company", "tag_play", "india_presence", "geo", "Signal Score", "why_now", "source"])
     for w in c["whitespace"]:
-        add([w["company"], w.get("tag_play", ""), w.get("geo", ""), w.get("score", ""),
-             w.get("why_now", ""), _link(w.get("link_url"))])
+        add([w["company"], w.get("tag_play", ""), w.get("india_presence", ""), w.get("geo", ""),
+             w.get("score", ""), w.get("why_now", ""), _link(w.get("link_url"))])
     add()
-    add(["TOP PROSPECTS (SS5) — tiered + actionable"])
-    add(["tier", "company", "tag_play", "score", "Δ", "new", "why_now", "signals",
-         "india_status", "last_signal", "source"])
+    add(["TOP PROSPECTS (SS5) — Signal Score + actionability"])
+    add(["tier", "company", "tag_play", "Signal Score", "score explanation", "Δ", "new",
+         "india_presence", "expansion_stage", "why_now", "signals", "last_signal", "source"])
     for p in c["prospects"]:
         add([p.get("tier", ""), p.get("company", ""), p.get("tag_play", ""), p.get("score", ""),
-             _delta(p), p.get("new_ev", ""), p.get("why_now", ""), p.get("signals", ""),
-             p.get("india_status", ""), p.get("last_signal", ""), _link(p.get("link_url"))])
+             _score_why(p), _delta(p), p.get("new_ev", ""),
+             p.get("india_presence", ""), p.get("expansion_stage", ""),
+             p.get("why_now", ""), p.get("signals", ""), p.get("last_signal", ""),
+             _link(p.get("link_url"))])
 
     ws = dc_sheets.get_tab(ss, dc.DASHBOARD_TAB, ["Dashboard"])
     dc_sheets._retry(ws.clear)
@@ -279,6 +329,19 @@ def write(ss, c):
             dc_sheets._retry(ss.batch_update, {"requests": reqs})
     except Exception as e:
         print(f"  [dashboard] heatmap coloring skipped: {e}")
+    # Signal Score legend, top-right (G3) — right of the emphasis bullets, above the heatmaps.
+    guide = [
+        ["SIGNAL SCORE GUIDE"],
+        ["Signal Score 0–100 = Momentum 35% + India/GCC relevance 25% + Verified partnerships 20% + Company-linked policy 20%"],
+        ["Tiers: T1 ≥60 strong · T2 40–59 qualify · T3 <40 monitor   (signal strength, NOT 'act now' — actionability = BD Priority)"],
+        [f"Δ = change vs last run, same scoring version ({dc.SCORING_VERSION}) · 'new' = first seen · 'reset' = formula changed"],
+        ["India presence ≠ MCA match: established / announced / no-known-presence / unknown"],
+        ["'score explanation' column = each component's points for that company"],
+    ]
+    try:
+        dc_sheets._retry(ws.update, "G3", guide, value_input_option="RAW")
+    except Exception as e:
+        print(f"  [dashboard] score guide skipped: {e}")
     _save_trend(c["movers"])             # advance baseline (all operators) after a rendered run
     return len(grid)
 
@@ -297,20 +360,36 @@ def _selfcheck():
     tabs = {"ss1": ss1, "ss2": [], "ss3": ss3, "ss4": ss4, "ss5": ss5, "entities": []}
     global _load_trend
     orig = _load_trend
-    _load_trend = lambda: {"operators": {"Yotta": {"score": 60, "ev_ids": ["a1"]}}}  # noqa: E731
+    # include the current scoring version so version_reset is False and Δ math is exercised
+    _load_trend = lambda: {"version": dc.SCORING_VERSION,                 # noqa: E731
+                           "operators": {"Yotta": {"score": 60, "ev_ids": ["a1"]}}}
     try:
         c = compute(tabs)
     finally:
         _load_trend = orig
     by = {p["company"]: p for p in c["movers"]}
-    assert by["Khazna"]["tag_play"] == "India market-entry", by["Khazna"]["tag_play"]
+    assert by["Khazna"]["tag_play"] == "India market-entry", by["Khazna"]["tag_play"]  # fallback path
     assert by["Yotta"]["tag_play"] == "India partnership", by["Yotta"]["tag_play"]
     assert by["Khazna"]["score_delta"] == "new", by["Khazna"]["score_delta"]
     assert by["Yotta"]["score_delta"] == 2.0, by["Yotta"]["score_delta"]   # 62 - 60
     assert by["Yotta"]["new_ev"] == 1, by["Yotta"]["new_ev"]               # j1 is new, a1 seen
     assert by["Yotta"]["tier"] == "T1" and by["Khazna"]["tier"] == "T2"
     assert by["Yotta"]["link_url"] == "http://x/a1", by["Yotta"]["link_url"]
+    # expansion_stage-driven tag_play mapping
+    assert _tag_play_probe({"expansion_stage": "scaling"}) == "India expansion"
+    assert _tag_play_probe({"expansion_stage": "entry"}) == "India market-entry"
+    # score_explanation components sum to the score (max inputs -> 35+25+20+20 = 100)
+    full = {"momentum": 10, "policy_tailwind": 5, "partnership_strength": 5, "geo": "India", "score": 100}
+    parts = [int(x) for x in re.findall(r"→(\d+)", _score_why(full))]
+    assert sum(parts) == 100, parts
     print("dc_dashboard self-check: OK")
+
+
+def _tag_play_probe(p):
+    """Expose the stage->play mapping for the self-check (mirrors compute._tag_play)."""
+    return {"entry": "India market-entry", "scaling": "India expansion",
+            "partnership": "India partnership", "policy_issue": "Govt-affairs hook",
+            "monitor": "Watch"}.get(p.get("expansion_stage"), "Watch")
 
 
 if __name__ == "__main__":

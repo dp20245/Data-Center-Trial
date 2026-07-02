@@ -110,6 +110,23 @@ def main():
                 _add(rec, f"NER:{org}")
 
     dc_mca.save_cache(cache)
+
+    # Presence/stage: separate legal-entity match from India presence + expansion stage so
+    # established players (AWS/Google/AirTrunk) are never mislabeled "market-entry". The
+    # manual Entity Overrides tab wins. Attaches fields in-memory to each ranked row.
+    import dc_presence
+    ov_header = ["company", "entity_match", "india_presence", "expansion_stage",
+                 "presence_evidence_url", "verified_date", "notes"]
+    try:
+        dc_sheets.get_tab(sheet, dc.ENTITY_OVERRIDES_TAB, ov_header)   # create if missing
+        ov_rows = dc_sheets.read_tab(sheet, dc.ENTITY_OVERRIDES_TAB)
+    except Exception as e:
+        print(f"  [overrides] {e}")
+        ov_rows = []
+    overrides = dc_presence.load_overrides(ov_rows)
+    for r in ranked:
+        r.update(dc_presence.classify(r, a4, overrides))
+
     print(f"  SS5 -> {dc_sheets.write_ss5(sheet, ranked)} ranked operators")
     print(f"  Entities spine -> {dc_sheets.write_entities(sheet, list(entities.values()))} resolved")
 

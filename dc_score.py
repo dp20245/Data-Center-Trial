@@ -57,6 +57,7 @@ def rank(ss1, ss2, ss3, ss4):
         ev, momentum, policy, partner = [], 0.0, 0, 0
         geos, layers, last = set(), set(), ""
         hits = []                                     # matched text for deal-size capture
+        seen_ev = set()                               # dedup momentum by event (not dup articles)
 
         for r in ss1 + ss2:  # article schema
             if _mentions(op, r.get("title"), r.get("summary")):
@@ -66,7 +67,12 @@ def rank(ss1, ss2, ss3, ss4):
                 if r in ss2:
                     policy += 1
                 else:
-                    momentum += w
+                    key = r.get("event_id") or r.get("id") or ""
+                    if key and key in seen_ev:
+                        pass          # duplicate coverage of the same event -> no inflation
+                    else:
+                        momentum += w
+                        seen_ev.add(key)
                 if r.get("geo"):
                     geos.update(g.strip() for g in r["geo"].split(";"))
                 if r.get("layer"):
@@ -91,7 +97,7 @@ def rank(ss1, ss2, ss3, ss4):
         if not ev:
             continue
 
-        in_geo = 1.0 if geos else 0.0
+        in_geo = 1.0 if "India" in geos else (0.5 if geos else 0.0)  # India full, GCC-only partial
         s = 100 * (
             WEIGHTS["momentum"] * min(momentum, 10) / 10
             + WEIGHTS["policy"] * min(policy, 5) / 5

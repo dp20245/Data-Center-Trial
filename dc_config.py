@@ -330,6 +330,20 @@ AI_MAX_TOKENS   = 4000              # 11 per-company dossiers need room (reasoni
 # 6-month horizon (senior ask): code-side date cutoff for discovery feeds. Google News
 # `when:6m` silently returns empty, so we filter by article date instead.
 RECENT_MONTHS = 6
+
+# Bump when the Signal Score formula changes -> dashboard resets the Δ baseline so
+# deltas across formula versions aren't shown as real movement.
+SCORING_VERSION = "v2"   # v2: graded geo (India 1.0/GCC 0.5) + unique-event momentum
+ENTITY_OVERRIDES_TAB = "Entity Overrides"
+# Companies KNOWN to already operate in India (established presence) — prevents the
+# "no MCA match => market-entry" misclassification (Codex: AWS/Google/MS/Meta/AirTrunk
+# are established; their play is expansion/partnership, not entry). One line to extend.
+KNOWN_INDIA_PLAYERS = [
+    "AWS", "Amazon", "Google", "Microsoft", "Meta", "Oracle", "AirTrunk", "Equinix",
+    "CtrlS", "STT GDC", "STT GDC India", "NTT", "Sify", "Nxtra", "AdaniConneX",
+    "Yotta", "Web Werks", "Digital Realty", "Princeton Digital", "Reliance",
+    "Tata Communications", "Pi Datacenters", "ESDS", "Nvidia",
+]
 # NewsData.io — India DC news (key via NEWSDATA_API_KEY secret; non-fatal if absent).
 # Use qInTitle (not q) + country=in for precision. ✅ verified 2026-07-02.
 NEWSDATA_URL     = "https://newsdata.io/api/1/latest"

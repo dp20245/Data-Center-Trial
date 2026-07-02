@@ -40,11 +40,15 @@ SYSTEM = (
     "site selection. Convert this Datacentre intelligence into TAG's best INDIA opportunities. "
     "Use ONLY the DATA provided below. Do NOT use outside knowledge or assumptions. Name the "
     "company every time and cite evidence ids or CIN.\n\n"
-    "TOP PRIORITY: Non-Indian companies announcing hyperscale DC investment in India in the "
-    "last ~6 months are TAG's HIGHEST-value targets — lead with them, name the deal size "
-    "(deal_value) and whether it's a market-ENTRY (no India entity) or GROWTH (foreign parent "
-    "already here via an FTC sub) play. Foreign-flagged companies (foreign=True) and the "
-    "FOREIGN HYPERSCALER MOVES digest below outrank domestic operators.\n\n"
+    "TOP PRIORITY: Non-Indian companies moving on hyperscale DC in India in the last ~6 months "
+    "are TAG's HIGHEST-value targets — lead with them and name the deal size (deal_value).\n"
+    "CRITICAL — use the presence fields, NOT MCA match, to decide the play:\n"
+    "- india_presence=established (e.g. AWS, Google, Microsoft, Meta, AirTrunk) => the company "
+    "is ALREADY in India; the play is India EXPANSION / partnership / govt-affairs — NEVER call "
+    "it market-entry, even if it has no MCA entity.\n"
+    "- india_presence=announced or no_known_presence + a deal/foreign flag => genuine market-ENTRY.\n"
+    "Follow expansion_stage (entry/scaling/partnership/policy_issue/monitor) for the TAG play. "
+    "Foreign-flagged companies + the FOREIGN HYPERSCALER MOVES digest outrank domestic operators.\n\n"
     "Lens — always reason toward an INDIA angle:\n"
     "- A company active in the GCC with NO India entity is a prime India MARKET-ENTRY target.\n"
     "- ownership=FTC/foreign-subsidiary means a foreign parent is ALREADY in India via a sub — "
@@ -147,7 +151,7 @@ def compile_context(tabs, c):
         L += ["", "=== FOREIGN HYPERSCALER MOVES (≤6mo — HIGHEST PRIORITY) ==="]
         for p in foreign:
             sz = f" | {p['deal_value']}" if p.get("deal_value") else ""
-            L.append(f"  {p.get('company')} | status={p.get('india_status')}{sz} "
+            L.append(f"  {p.get('company')} | {p.get('india_presence', '?')}/{p.get('expansion_stage', '?')}{sz} "
                      f"| {p.get('why_now', '')} | ev={p.get('top_evidence_ids')}")
 
     # ---- deep per-company dossier data: 1 block per SS5 company (all 11) ----
@@ -172,8 +176,12 @@ def compile_context(tabs, c):
                  f"tier={p.get('tier')} momentum={p.get('momentum')} last={p.get('last_signal')}")
         L.append(f"  profile: layers={p.get('layer')} geo={p.get('geo')} signals=[{p.get('signals', '')}] "
                  f"filings={p.get('partnership_strength', 0)} policy={p.get('policy_tailwind', 0)} "
-                 f"status={p.get('india_status')} play={p.get('tag_play')} "
-                 f"foreign={p.get('is_foreign', False)} deal_value={p.get('deal_value') or '—'}")
+                 f"play={p.get('tag_play')} foreign={p.get('is_foreign', False)} "
+                 f"deal_value={p.get('deal_value') or '—'}")
+        L.append(f"  presence: entity_match={p.get('entity_match', '?')} "
+                 f"india_presence={p.get('india_presence', '?')} "
+                 f"expansion_stage={p.get('expansion_stage', '?')} "
+                 f"(established => NOT market-entry)")
         ids = [i.strip() for i in (p.get("top_evidence_ids") or "").split(",") if i.strip()]
         ev = [f"    - [{i}] {evidx[i]}" for i in ids if i in evidx][:6]
         if ev:
