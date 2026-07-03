@@ -129,7 +129,7 @@ def ai_draft(rows, evidence_by_company):
                 json.dumps({"company": co, "trigger": tr, "stage": st, "evidence": ev[:5]},
                            ensure_ascii=False) for co, tr, st, ev, _h in todo)
             try:
-                arr = dc_ai._json_array(dc_ai._chat(key, _BD_SYS, user, 1800, 0.2))
+                arr = dc_ai._json_array(dc_ai._chat(key, _BD_SYS, user, 3500, 0.2))
                 byco = {o.get("company"): o for o in arr if isinstance(o, dict)}
                 for co, tr, st, ev, h in todo:
                     o = byco.get(co)
