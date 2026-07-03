@@ -235,9 +235,17 @@ def _chat(key, system, user, max_tokens, temperature=0.2):
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
                  "HTTP-Referer": "https://github.com/dp20245/Data-Center-Trial",
                  "X-Title": "Datacentre BI"})
-    with urllib.request.urlopen(req, timeout=120) as r:
-        d = json.loads(r.read().decode("utf-8", "ignore"))
-    return d["choices"][0]["message"]["content"]
+    last = None
+    for attempt in range(3):        # transient truncated/non-JSON responses -> retry
+        try:
+            with urllib.request.urlopen(req, timeout=120) as r:
+                d = json.loads(r.read().decode("utf-8", "ignore"))
+            return d["choices"][0]["message"]["content"]
+        except (json.JSONDecodeError, KeyError, urllib.error.HTTPError) as e:
+            last = e
+            import time
+            time.sleep(2 * (attempt + 1))
+    raise last
 
 
 def call_model(key, user):
@@ -263,9 +271,22 @@ CLASSIFY_SYSTEM = (
 
 
 def _json_array(text):
-    """Extract the first JSON array from possibly-wrapped model output."""
+    """Extract a JSON array from possibly-wrapped/malformed model output. Tolerant:
+    falls back to parsing individual {...} objects so one bad field doesn't lose the rest."""
     i, j = (text or "").find("["), (text or "").rfind("]")
-    return json.loads(text[i:j + 1]) if 0 <= i < j else []
+    if 0 <= i < j:
+        try:
+            return json.loads(text[i:j + 1])
+        except json.JSONDecodeError:
+            pass
+    import re
+    out = []
+    for m in re.findall(r"\{[^{}]*\}", text or ""):
+        try:
+            out.append(json.loads(m))
+        except json.JSONDecodeError:
+            continue
+    return out
 
 
 def classify_tenders(candidates):
