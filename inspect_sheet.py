@@ -6,8 +6,8 @@ import dc_config as dc
 
 def main():
     ss = dc_sheets.connect()
-    for tab in [dc.DASHBOARD_TAB, dc.BD_PIPELINE_TAB, dc.GCC_WATCH_TAB, dc.EVIDENCE_TAB,
-                dc.SS5_RANKED_TAB, dc.AI_SUMMARY_TAB]:
+    for tab in [dc.MD_VIEW_TAB, dc.BD_PIPELINE_TAB, dc.DASHBOARD_TAB, dc.GCC_WATCH_TAB,
+                dc.EVIDENCE_TAB, dc.SS5_RANKED_TAB, dc.AI_SUMMARY_TAB]:
         print(f"\n===== {tab} =====")
         try:
             vals = ss.worksheet(tab).get_all_values()
