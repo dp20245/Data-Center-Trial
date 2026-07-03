@@ -12,7 +12,7 @@ def main():
         try:
             vals = ss.worksheet(tab).get_all_values()
             print(f"({len(vals)} rows)")
-            for i, row in enumerate(vals[:48]):
+            for i, row in enumerate(vals[:72]):
                 line = " | ".join(c[:26] for c in row)
                 print(f"{i + 1:3}| {line[:230]}")
         except Exception as e:
