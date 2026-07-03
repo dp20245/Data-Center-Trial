@@ -335,6 +335,9 @@ RECENT_MONTHS = 6
 # deltas across formula versions aren't shown as real movement.
 SCORING_VERSION = "v2"   # v2: graded geo (India 1.0/GCC 0.5) + unique-event momentum
 ENTITY_OVERRIDES_TAB = "Entity Overrides"
+EVIDENCE_TAB    = "Evidence Register"   # every hash -> readable, clickable record
+BD_PIPELINE_TAB = "BD Pipeline"         # actionable India opportunities (P1/P2/P3)
+GCC_WATCH_TAB   = "GCC Watch"           # GCC-only operators, out of the India pipeline
 # Companies KNOWN to already operate in India (established presence) — prevents the
 # "no MCA match => market-entry" misclassification (Codex: AWS/Google/MS/Meta/AirTrunk
 # are established; their play is expansion/partnership, not entry). One line to extend.

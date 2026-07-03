@@ -54,7 +54,7 @@ jobs:
         run: |
           git config user.name  "dc-engine-bot"
           git config user.email "dc-engine-bot@users.noreply.github.com"
-          for f in mca_cache.json ai_cache.json dc_trend.json tender_cache.json presence_cache.json; do
+          for f in mca_cache.json ai_cache.json dc_trend.json tender_cache.json presence_cache.json bd_cache.json; do
             [ -f "$f" ] && git add "$f"    # tolerate a cache that a run didn't produce
           done
           if git diff --staged --quiet; then
@@ -89,6 +89,7 @@ jobs:
             dc_trend.json
             tender_cache.json
             presence_cache.json
+            bd_cache.json
             mca_cache.json
           if-no-files-found: ignore
           retention-days: 30

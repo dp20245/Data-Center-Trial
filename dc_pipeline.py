@@ -157,16 +157,39 @@ def main():
     print(f"  SS5 -> {dc_sheets.write_ss5(sheet, ranked)} ranked operators")
     print(f"  Entities spine -> {dc_sheets.write_entities(sheet, list(entities.values()))} resolved")
 
-    # Dashboard (computed heatmaps, always-on) + AI Summary (Nemotron, grounded, cached).
-    # Both non-fatal: a failure here never breaks the SS1-SS5 pipeline.
+    # Dashboard + AI Summary + Evidence Register + BD Pipeline. All non-fatal: a failure
+    # here never breaks the SS1-SS5 pipeline.
     import dc_dashboard
     import dc_ai
+    import dc_evidence
+    import dc_bd
     tabs = {"ss1": a1, "ss2": a2, "ss3": a3, "ss4": a4,
             "ss5": ranked, "entities": list(entities.values())}
+
+    # Evidence Register (hash -> readable, clickable record) — feeds descriptive links everywhere.
+    register = dc_evidence.build_register(tabs, ranked)
+    try:
+        print(f"  Evidence Register -> {dc_evidence.write_register(sheet, register)} rows")
+    except Exception as e:
+        print(f"  [evidence] non-fatal error: {e}")
+
+    # BD Pipeline (P1/P2/P3) + GCC Watch. Soft columns AI-drafted (grounded, marked, non-fatal).
+    try:
+        evidx = dc_ai._ev_index(tabs)
+        ev_by = {r["company"]: [evidx[i] for i in
+                                [x.strip() for x in (r.get("top_evidence_ids") or "").split(",") if x.strip()]
+                                if i in evidx][:5] for r in ranked}
+        pipe, gcc = dc_bd.build(ranked, register)
+        dc_bd.ai_draft(pipe, ev_by)
+        n_bd, n_gcc = dc_bd.write(sheet, pipe, gcc)
+        print(f"  BD Pipeline -> {n_bd} opportunities · GCC Watch -> {n_gcc}")
+    except Exception as e:
+        print(f"  [bd] non-fatal error: {e}")
+
     try:
         computed = dc_dashboard.compute(tabs)
-        print(f"  Dashboard -> {dc_dashboard.write(sheet, computed)} rows")
-        dc_ai.summarize(sheet, tabs, computed)
+        print(f"  Dashboard -> {dc_dashboard.write(sheet, computed, register)} rows")
+        dc_ai.summarize(sheet, tabs, computed, register)
     except Exception as e:
         print(f"  [dashboard/ai] non-fatal error: {e}")
 

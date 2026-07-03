@@ -123,7 +123,14 @@ def _ev_index(tabs):
     return idx
 
 
-def compile_context(tabs, c):
+def compile_context(tabs, c, register=None):
+    import dc_evidence
+
+    def _evlabels(csv):
+        ids = [i.strip() for i in (csv or "").split(",") if i.strip()]
+        if not register:
+            return csv
+        return "; ".join(dc_evidence.label(i, register) for i in ids[:4])
     # Brief global block for the EXECUTIVE READ + RANKING, then a deep per-company block.
     L = ["=== HEATMAPS ===",
          "Geo(market×layer): " + json.dumps(c["geo_hm"]),
@@ -153,7 +160,7 @@ def compile_context(tabs, c):
         for p in foreign:
             sz = f" | {p['deal_value']}" if p.get("deal_value") else ""
             L.append(f"  {p.get('company')} | {p.get('india_presence', '?')}/{p.get('expansion_stage', '?')}{sz} "
-                     f"| {p.get('why_now', '')} | ev={p.get('top_evidence_ids')}")
+                     f"| {p.get('why_now', '')} | ev={_evlabels(p.get('top_evidence_ids'))}")
 
     # ---- deep per-company dossier data: 1 block per SS5 company (all 11) ----
     ents = {r.get("cin"): r for r in tabs.get("entities", []) if r.get("cin")}
@@ -185,7 +192,8 @@ def compile_context(tabs, c):
                  f"expansion_stage={p.get('expansion_stage', '?')} "
                  f"(established => NOT market-entry)")
         ids = [i.strip() for i in (p.get("top_evidence_ids") or "").split(",") if i.strip()]
-        ev = [f"    - [{i}] {evidx[i]}" for i in ids if i in evidx][:6]
+        ev = [f"    - [{dc_evidence.label(i, register) if register else i}] {evidx[i]}"
+              for i in ids if i in evidx][:6]
         if ev:
             L += ["  evidence:"] + ev
 
@@ -313,11 +321,11 @@ def _write(ss, header, body):
         print(f"  [ai] wrap formatting skipped: {e}")
 
 
-def summarize(ss, tabs, computed):
+def summarize(ss, tabs, computed, register=None):
     """Never raises — degrades to 'Didn't Work' on any failure."""
     try:
         cache = load_cache()
-        ctx = compile_context(tabs, computed)
+        ctx = compile_context(tabs, computed, register)
         h = hashlib.sha1(ctx.encode("utf-8")).hexdigest()
         last_good = cache.get("summary", "(no prior AI summary yet)")
         last_ts = cache.get("timestamp", "never")

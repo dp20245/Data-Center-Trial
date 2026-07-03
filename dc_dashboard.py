@@ -181,6 +181,7 @@ def compute(tabs):
         p["signals"] = " · ".join(f"{n} {k}" for k, n in kinds.most_common()) or "—"
         p["fresh_7d"] = fresh
         p["link_url"] = next((ev_url[i] for i in ids if ev_url.get(i)), "")
+        p["link_id"] = next((i for i in ids if ev_url.get(i)), "")   # for descriptive evidence label
         p["tier"] = "T1" if float(p.get("score") or 0) >= 60 else "T2" if float(p.get("score") or 0) >= 40 else "T3"
         p["tag_play"] = _tag_play(p)
         p["why_now"] = _why_now(p, fresh)
@@ -265,7 +266,7 @@ def _gradient_reqs(ss, ws, ranges):
     return reqs
 
 
-def write(ss, c):
+def write(ss, c, register=None):
     import dc_sheets
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     grid, hm_ranges = [], []
@@ -300,6 +301,12 @@ def write(ss, c):
         u = (url or "").replace('"', "")
         return f'=HYPERLINK("{u}","open")' if u else ""
 
+    def _source(row):        # descriptive "Publisher — date" link via the Evidence Register
+        if register and row.get("link_id"):
+            import dc_evidence
+            return dc_evidence.hyperlink(row["link_id"], register)
+        return _link(row.get("link_url"))
+
     def _delta(p):
         d = p.get("score_delta")
         return "new" if d == "new" else (f"+{d}" if isinstance(d, (int, float)) and d > 0 else str(d))
@@ -308,7 +315,7 @@ def write(ss, c):
     add(["company", "tag_play", "india_presence", "geo", "Signal Score", "why_now", "source"])
     for w in c["whitespace"]:
         add([w["company"], w.get("tag_play", ""), w.get("india_presence", ""), w.get("geo", ""),
-             w.get("score", ""), w.get("why_now", ""), _link(w.get("link_url"))])
+             w.get("score", ""), w.get("why_now", ""), _source(w)])
     add()
     add(["TOP PROSPECTS (SS5) — Signal Score + actionability"])
     add(["tier", "company", "tag_play", "Signal Score", "score explanation", "Δ", "new",
@@ -318,7 +325,7 @@ def write(ss, c):
              _score_why(p), _delta(p), p.get("new_ev", ""),
              p.get("india_presence", ""), p.get("expansion_stage", ""),
              p.get("why_now", ""), p.get("signals", ""), p.get("last_signal", ""),
-             _link(p.get("link_url"))])
+             _source(p)])
 
     ws = dc_sheets.get_tab(ss, dc.DASHBOARD_TAB, ["Dashboard"])
     dc_sheets._retry(ws.clear)
