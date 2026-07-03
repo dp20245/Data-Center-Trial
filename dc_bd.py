@@ -33,7 +33,10 @@ _BD_SYS = (
     "market-entry / government & regulatory / state land+power coordination / partnerships), "
     "public_buyer (the Indian public/government stakeholder + role, ONLY if implied by the data, "
     "else empty), intro_path (how TAG reaches them; generic if unknown), next_action (one concrete "
-    "step). Each field <= 14 words. Output ONLY a JSON array: "
+    "step). Each field <= 14 words.\n"
+    "tag_wedge MUST match the India stage: established/scaling => expansion / government-affairs / "
+    "partnership (NEVER 'market-entry'); announced or no-known-presence => market-entry.\n"
+    "Output ONLY a JSON array: "
     '[{"company":"..","pain_point":"..","tag_wedge":"..","public_buyer":"..","intro_path":"..","next_action":".."}]'
 )
 
@@ -61,9 +64,11 @@ def _confidence(r):
 
 def _trigger(r, register):
     ids = [i.strip() for i in (r.get("top_evidence_ids") or "").split(",") if i.strip()]
-    head = next((register[i]["headline"][:80] for i in ids
-                 if register.get(i) and register[i].get("headline")), "")
-    return " · ".join(p for p in (r.get("deal_value"), head) if p) or (r.get("development_type") or "activity")
+    co = (r.get("company") or "").lower().split()[0] if r.get("company") else ""
+    heads = [register[i]["headline"] for i in ids if register.get(i) and register[i].get("headline")]
+    # prefer a headline that actually names the company (avoids e.g. a CEVA headline on AirTrunk)
+    head = next((h for h in heads if co and co in h.lower()), heads[0] if heads else "")
+    return " · ".join(p for p in (r.get("deal_value"), head[:80]) if p) or (r.get("development_type") or "activity")
 
 
 def build(ranked, register):
@@ -176,12 +181,10 @@ def _selfcheck():
     assert byco["SmallCo"]["Priority"] == "P3 Monitor", byco["SmallCo"]
     assert "AirTrunk $5B India DC" in byco["AirTrunk"]["Trigger"]
     assert byco["AirTrunk"]["Evidence"] == "ET — 1 Jul"
-    # AI draft marks cells (stub) and stays non-fatal without a key
+    # AI draft is non-fatal without a key (soft cols stay blank); does not touch the cache file
     os.environ.pop("OPENROUTER_API_KEY", None)
-    open(BD_CACHE, "w").write('{}')
     ai_draft(pipe, {"AirTrunk": ["evidence"]})
     assert byco["AirTrunk"]["Pain point"] == "", "no key => soft cols blank"
-    os.remove(BD_CACHE)
     print("dc_bd self-check: OK")
 
 

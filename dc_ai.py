@@ -342,8 +342,72 @@ def _write(ss, header, body):
         print(f"  [ai] wrap formatting skipped: {e}")
 
 
+# --- AI determinism: code builds RANKING + dossier structure; the model only writes prose ---
+_ANALYSIS_SYS = (
+    "detailed thinking off\n\n"
+    "You are a TAG (The Asia Group) India business-development analyst. Using ONLY the DATA below "
+    "(no outside facts, no invented numbers), write concise India-focused prose. You MAY add brief "
+    "general background about a company that already appears in the DATA with a leading [context] "
+    "tag. Decide entry vs expansion from india_presence (established => expansion, NOT market-entry).\n"
+    "Output ONLY JSON:\n"
+    '{"executive_read":"3-5 short sentences: where India activity concentrates (states/layers), the '
+    'top India policy hook, the value-chain movers, and this run\'s foreign-hyperscaler India moves",'
+    '"analyses":{"<Company>":"2-4 sentences: why-now, entry vs expansion, the TAG play, and the deal '
+    'size if present"}}. Include every company in the PER-COMPANY DOSSIER DATA.'
+)
+
+
+def _json_obj(text):
+    i, j = (text or "").find("{"), (text or "").rfind("}")
+    try:
+        return json.loads(text[i:j + 1]) if 0 <= i < j else {}
+    except Exception:
+        return {}
+
+
+def _fmt_delta(p):
+    d = p.get("score_delta")
+    if d in ("new", "reset"):
+        return d
+    return f"+{d}" if isinstance(d, (int, float)) and d > 0 else str(d)
+
+
+def _ev_labels(p, register):
+    ids = [i.strip() for i in (p.get("top_evidence_ids") or "").split(",") if i.strip()][:3]
+    if register:
+        import dc_evidence
+        return "; ".join(dc_evidence.label(i, register) for i in ids)
+    return ", ".join(ids)
+
+
+def _build_ranking(movers, register):
+    lines = ["RANKING", "Rank | Company | Tier | Score Δ | India status | TAG play | Evidence"]
+    for n, p in enumerate(sorted(movers, key=lambda x: float(x.get("score") or 0), reverse=True), 1):
+        lines.append(" | ".join([str(n), p.get("company", ""), p.get("tier", ""), _fmt_delta(p),
+                                  f"{p.get('india_presence', '?')}/{p.get('expansion_stage', '?')}",
+                                  p.get("tag_play", ""), _ev_labels(p, register)]))
+    return lines
+
+
+def _build_dossiers(movers, ents_by_cin, register, analyses):
+    lines = ["COMPANY DOSSIERS",
+             "Company | Entity | Momentum | Signals | Why-now | TAG play | Analysis | Evidence"]
+    for p in sorted(movers, key=lambda x: float(x.get("score") or 0), reverse=True):
+        co = p.get("company", "")
+        e = ents_by_cin.get(p.get("cin"), {})
+        entity = (f"{e.get('ownership', '?')}/{e.get('company_class', '?')} · inc {e.get('inc_year', '?')} · {e.get('state', '?')}"
+                  if e else "no MCA entity (foreign)")
+        mom = (f"score {p.get('score')} ({_fmt_delta(p)}) · mom {p.get('momentum')} · "
+               f"{p.get('fresh_7d', 0)} new≤7d · {p.get('tier')}")
+        analysis = (analyses.get(co) or "").replace("|", "/").replace("\n", " ")
+        lines.append(" | ".join([co, entity, mom, p.get("signals", ""), p.get("why_now", ""),
+                                  p.get("tag_play", ""), analysis, _ev_labels(p, register)]))
+    return lines
+
+
 def summarize(ss, tabs, computed, register=None):
-    """Never raises — degrades to 'Didn't Work' on any failure."""
+    """Never raises — degrades to 'Didn't Work' on any failure. Code builds the RANKING +
+    dossier structure (deterministic); the model writes only the executive read + analyses."""
     try:
         cache = load_cache()
         ctx = compile_context(tabs, computed, register)
@@ -369,21 +433,30 @@ def summarize(ss, tabs, computed, register=None):
             print(f"  AI Summary -> connection test failed: {note}")
             return
 
+        # AI writes ONLY prose; if it fails the tables are still built deterministically.
+        obj = {}
         try:
-            summary = call_model(key, ctx)
+            obj = _json_obj(_chat(key, _ANALYSIS_SYS, ctx, dc.AI_MAX_TOKENS, 0.2))
         except Exception as e:
-            _write(ss, f"⚠️ AI Summary — Didn't Work (call failed: {e}). Last successful: {last_ts}. Attempted {_now()}", last_good)
-            print(f"  AI Summary -> call failed: {e}")
-            return
+            print(f"  [ai] analysis call failed (tables stay deterministic): {e}")
 
-        known = sorted({r.get("legal_name", "") for r in tabs.get("entities", [])}
-                       | {p.get("company", "") for p in computed["prospects"]})
-        summary += "\n\n— Grounding set (companies in sheet): " + ", ".join(filter(None, known))
+        movers = computed.get("movers", [])
+        ents_by_cin = {r.get("cin"): r for r in tabs.get("entities", []) if r.get("cin")}
+        exec_read = (obj.get("executive_read") or "(AI narrative unavailable this run)").strip()
+        analyses = obj.get("analyses") or {}
+        summary = "\n".join(
+            ["EXECUTIVE READ", exec_read, ""]
+            + _build_ranking(movers, register) + [""]
+            + _build_dossiers(movers, ents_by_cin, register, analyses))
+
         ts = _now()
         _write(ss, f"AI Summary — Last AI check: {ts} · model {dc.DC_AI_MODEL} · budget left: {rem}", summary)
-        cache.update({"hash": h, "summary": summary, "timestamp": ts,
-                      "model": dc.DC_AI_MODEL, "status": "ok"})
-        save_cache(cache)
-        print("  AI Summary -> generated + cached")
+        if obj:                       # cache only when the AI prose succeeded (else retry next run)
+            cache.update({"hash": h, "summary": summary, "timestamp": ts,
+                          "model": dc.DC_AI_MODEL, "status": "ok"})
+            save_cache(cache)
+            print("  AI Summary -> generated + cached (deterministic tables + AI prose)")
+        else:
+            print("  AI Summary -> deterministic tables written; AI prose retry next run")
     except Exception as e:
         print(f"  [ai] non-fatal error: {e}")

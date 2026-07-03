@@ -338,6 +338,7 @@ ENTITY_OVERRIDES_TAB = "Entity Overrides"
 EVIDENCE_TAB    = "Evidence Register"   # every hash -> readable, clickable record
 BD_PIPELINE_TAB = "BD Pipeline"         # actionable India opportunities (P1/P2/P3)
 GCC_WATCH_TAB   = "GCC Watch"           # GCC-only operators, out of the India pipeline
+MD_VIEW_TAB     = "MD View"             # curated P1/P2 top-slice for leadership
 # Companies KNOWN to already operate in India (established presence) — prevents the
 # "no MCA match => market-entry" misclassification (Codex: AWS/Google/MS/Meta/AirTrunk
 # are established; their play is expansion/partnership, not entry). One line to extend.

@@ -183,6 +183,14 @@ def main():
         dc_bd.ai_draft(pipe, ev_by)
         n_bd, n_gcc = dc_bd.write(sheet, pipe, gcc)
         print(f"  BD Pipeline -> {n_bd} opportunities · GCC Watch -> {n_gcc}")
+        # MD View — curated P1/P2 top-slice for leadership.
+        import dc_md
+        from datetime import datetime, timezone
+        link_by = {r["company"]: next((i.strip() for i in (r.get("top_evidence_ids") or "").split(",")
+                                       if i.strip()), "") for r in ranked}
+        stats = (f"MD VIEW — India DC opportunities · {len(register)} evidence sources · "
+                 f"{n_bd} pipeline entries · updated {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}")
+        print(f"  MD View -> {dc_md.write(sheet, dc_md.build(pipe, link_by, register), stats)} rows")
     except Exception as e:
         print(f"  [bd] non-fatal error: {e}")
 

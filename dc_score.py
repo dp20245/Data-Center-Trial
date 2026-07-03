@@ -17,14 +17,26 @@ WEIGHTS = {"momentum": 0.35, "policy": 0.20, "geo": 0.25, "partner": 0.20}
 
 # Deal-size capture for big-ticket foreign investment (deterministic, headline-led).
 _MONEY = re.compile(
-    r'(?:US\$|\$|₹|Rs\.?|INR|USD)\s?[\d,.]+\s?(?:billion|bn|trillion|tn|crore|cr|million|mn|lakh)?'
-    r'|[\d,.]+\s?(?:billion|bn|crore|cr|trillion|million|mn|lakh)',
+    r'(?:US\$|\$|₹|Rs\.?|INR|USD)\s?\d[\d,.]*\s?(?:billion|bn|trillion|tn|crore|cr|million|mn|lakh)'
+    r'|\d[\d,.]*\s?(?:billion|bn|crore|cr|trillion|tn|million|mn|lakh)',
     re.I)
 
 
-def _deal_value(text):
-    m = _MONEY.search(text or "")
-    return m.group(0).strip() if m else ""
+def _deal_value(snippets):
+    """A money figure REQUIRING a unit (drops '$13'/'rs,'). Scans per snippet and prefers one
+    that also mentions India (drops global/aspirational figures). Accepts a str or list."""
+    if isinstance(snippets, str):
+        snippets = [snippets]
+    fallback = ""
+    for s in snippets:
+        m = _MONEY.search(s or "")
+        if not m:
+            continue
+        val = m.group(0).strip()
+        if "india" in (s or "").lower():
+            return val
+        fallback = fallback or val
+    return fallback
 
 
 def _parse(d):
@@ -118,7 +130,7 @@ def rank(ss1, ss2, ss3, ss4):
             "last_signal": last,
             "top_evidence_ids": ", ".join(e for e in ev[:8] if e),
             "is_foreign": op.lower() in _FOREIGN,       # non-Indian hyperscaler/investor
-            "deal_value": _deal_value(" ".join(hits)),  # big-ticket size, if named
+            "deal_value": _deal_value(hits),            # big-ticket size (unit-required, India-scoped)
         })
     out.sort(key=lambda r: r["score"], reverse=True)
     return out
