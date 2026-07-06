@@ -44,9 +44,12 @@ def _filing_url(adsh, cik, fname):
 _DOC_CACHE = {}
 
 
-def fetch_doc_text(url, cap=800_000):
+def fetch_doc_text(url, cap=16_000_000):
     """Fetch a filing document, strip HTML, return plain text (capped, cached).
-    Requests identity encoding so a capped read isn't a truncated gzip stream."""
+    Requests identity encoding so a capped read isn't a truncated gzip stream.
+    Cap is 16 MB: inline-XBRL 20-Fs are multi-MB (Sify's is 6.9 MB) and their readable
+    narrative sits AFTER a large XBRL fact/context block — a tight cap truncates the whole
+    Item 3-5 body and leaves only tag-soup. 16 MB covers current filers with headroom."""
     if not url:
         return ""
     if url in _DOC_CACHE:

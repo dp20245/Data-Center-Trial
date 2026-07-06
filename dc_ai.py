@@ -353,7 +353,7 @@ def judge_filings(candidates):
         user = (f"SECTION: {c.get('section') or 'Other'}\n"
                 f"FILER: {c.get('filer', '')} ({c.get('form', '')})\n"
                 f"KEYWORD MATCHES: {c.get('matched_terms', '')}\n\n"
-                f"EXCERPT:\n{(c.get('window_text') or '')[:12000]}")
+                f"EXCERPT:\n{(c.get('window_text') or '')[:60000]}")
         try:
             o = _json_obj(_chat(key, JUDGE_SYSTEM, user, max_tokens=400, temperature=0.0))
             if o:
