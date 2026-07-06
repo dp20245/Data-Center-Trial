@@ -20,7 +20,7 @@ ARTICLE_HEADER = ["id", "date", "source", "layer", "geo", "title", "url",
 SS1_HEADER = ARTICLE_HEADER  # back-compat
 SS3_HEADER = ["accession", "filed_date", "filer", "cik", "form",
               "counterparty_region", "deal_type", "layer", "matched_terms",
-              "confidence", "evidence", "url"]
+              "confidence", "section", "relevance", "evidence", "url"]
 SS4_HEADER = ["id", "observed_date", "signal_type", "actor", "geo", "layer",
               "magnitude", "confidence", "url", "excerpt"]
 SS5_HEADER = ["company", "cin", "india_status", "partner", "development_type",

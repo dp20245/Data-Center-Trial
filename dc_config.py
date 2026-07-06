@@ -163,11 +163,15 @@ EDGAR_GEO_TERMS = ['"data center" India', '"data center" UAE',
 # Geo terms reuse dc_ingest.GEO_KEYWORDS. These drive the evidence window + matched_terms.
 DC_TERMS = ["data center", "data centre", "datacenter", "datacentre",
             "hyperscale", "colocation", "colo ", "server farm", "campus"]
+# Polished 2026-07-06: dropped over-broad "facility"/"plant"/"capacity" (they matched
+# pipe plants, corporate campuses, generic capacity talk); kept "new facility". "acquisition"
+# stays but only counts when it lands inside the DC-anchored window (SPAC "Acquisition Corp"
+# names in boilerplate no longer qualify a row on their own).
 ACTION_TERMS = ["invest", "investment", "capex", "capital expenditure", "expand",
-                "expansion", "new facility", "facility", "plant", "construct",
-                "construction", "megawatt", " mw ", "partnership", "joint venture",
-                " jv ", "mou", "memorandum of understanding", "acquisition",
-                "acquire", "supply agreement", "capacity", "ground-break"]
+                "expansion", "new facility", "construct", "construction",
+                "megawatt", " mw ", "partnership", "joint venture", " jv ",
+                "mou", "memorandum of understanding", "acquisition", "acquire",
+                "supply agreement", "ground-break"]
 # Ordered: first match wins as deal_type (most specific first).
 DEAL_TYPE_TERMS = [
     ("joint venture", "JV"), (" jv ", "JV"),
@@ -179,8 +183,20 @@ DEAL_TYPE_TERMS = [
     ("expansion", "facility-expansion"), ("new facility", "facility-expansion"),
     ("facility", "facility-expansion"), ("construction", "facility-expansion"),
 ]
-EDGAR_EVIDENCE_WINDOW = 500   # chars: DC↔geo↔action proximity for "high" confidence
+EDGAR_EVIDENCE_WINDOW = 500   # chars: DC↔geo↔action proximity for keyword "high" confidence
+EDGAR_EVIDENCE_WORDS = 500    # words each side of the anchor kept as context for the AI judge
 EDGAR_MAX_DOCS = 25           # fetch+parse the N most-recent hits per run (perf cap)
+
+# Evidence section prioritization (2026-07-06): a filing mentions "data center" in many
+# places; prefer intentional forward-looking prose. The extractor scans sections in THIS
+# order and anchors on the first Risk-Factors/Growth hit before falling back to Other, so a
+# country-list in an exhibit never wins over a real risk/growth passage. (regex on lowered
+# section headers; label lands in the SS3 `section` column and is told to the AI judge.)
+EDGAR_SECTION_PRIORITY = [
+    ("Risk Factors", r"item\s+1a\.?\s+risk factors|item\s+3\.?\s*d\.?\s*[-—]?\s*risk factors|(?<![a-z])risk factors(?![a-z])"),
+    ("Growth Outlook", r"and prospects|growth strateg|business strateg|(?<![a-z])our strategy|future outlook|(?<![a-z])outlook(?![a-z])|opportunit|(?<![a-z])guidance(?![a-z])"),
+    ("Business", r"item\s+4\.?\s+information on the company|management.s discussion|(?<![a-z])business overview|item\s+1\.?\s+business"),
+]
 # Poll these CIKs' submissions feeds directly (data.sec.gov/submissions/CIK##########.json):
 EDGAR_CIKS = {
     "Equinix":        "0001101239",

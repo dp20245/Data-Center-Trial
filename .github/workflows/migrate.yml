@@ -1,0 +1,23 @@
+name: Migrate SS3 schema (one-shot)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install gspread google-auth
+      - name: Clear SS3 + rewrite header
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          DC_SPREADSHEET_ID: ${{ secrets.DC_SPREADSHEET_ID }}
+        run: python migrate_ss3.py
