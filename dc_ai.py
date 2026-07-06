@@ -328,7 +328,9 @@ JUDGE_SYSTEM = (
     "Output ONLY a JSON object, no prose:\n"
     '{"relevant":true|false,"region":"India|UAE|Saudi Arabia|Qatar|Bahrain|Kuwait|Oman|null",'
     '"deal_type":"<short phrase or null>","layer":"Compute|Cooling|Power|Network|Colo|Build|General",'
-    '"confidence":"high|med|low","why":"<=20 words grounded in the excerpt"}'
+    '"confidence":"high|med|low","why":"<=20 words grounded in the excerpt",'
+    '"evidence_quote":"<the single most relevant sentence, copied VERBATIM from the excerpt — '
+    'exact characters, no paraphrasing or ellipsis; empty string if none>"}'
 )
 
 
