@@ -406,3 +406,176 @@ DC_COMPANY_GAZETTEER = sorted(set(WATCH_OPERATORS_INDIA + WATCH_OPERATORS_GCC + 
     "Tata Communications", "Reliance", "Nvidia", "AMD", "TSMC", "Vertiv",
     "Schneider", "Microsoft", "Amazon", "Google", "Oracle", "Meta",
 ] + WATCH_OPERATORS_FOREIGN))
+
+# ===========================================================================
+# 11. PHASE 4 REGISTRIES  (approved PRD 2026-07-04 — see docs/PHASE4_PRD.md)
+# ===========================================================================
+# All registries below are INERT until their consumer milestone lands (config-as-
+# registry discipline: extend any list/map in one line). AI BOUNDARY (locked):
+# deterministic rules + curated lists own role/type/priority; AI may only DROP or
+# LABEL evidence, flag Noise/Market-signal downgrades, or write grounded
+# 🤖AI-draft prose. Entity Overrides is the only human upgrade path.
+
+# --- Shared signal taxonomy -------------------------------------------------
+# ONE vocabulary consumed by (a) the SS3 multi-signal judge (menu; off-menu labels
+# are dropped in code), (b) R1 role rules ("direct India signal" = direct_action
+# AND region India), (c) R3 BD trigger-strength (trigger_weight × recency decay).
+# label: (trigger_weight 0-1, direct_action, description-for-judge-prompt)
+SIGNAL_LABELS = {
+    "capex-commitment":     (1.0, True,  "committed capital expenditure for a DC build"),
+    "capacity-commitment":  (1.0, True,  "MW/GW or sqft data-centre capacity commitment"),
+    "land-acquisition":     (0.9, True,  "land purchase/allotment for a DC site"),
+    "acquisition":          (0.9, True,  "M&A of a DC operator/asset"),
+    "jv-partnership":       (0.8, True,  "JV/partnership/MoU for DC development"),
+    "market-entry-intent":  (0.7, True,  "stated intent to enter a market"),
+    "expansion-existing":   (0.7, True,  "expansion of an existing facility"),
+    "energy-procurement":   (0.6, True,  "PPA/captive power/grid deal for a DC"),
+    "customer-contract":    (0.5, True,  "colocation/cloud capacity contract"),
+    "financing":            (0.5, True,  "debt/equity raise earmarked for DC"),
+    "regulatory-engagement":(0.4, False, "license/approval/incentive application"),
+    "hiring-buildout":      (0.3, False, "DC-ops hiring signal"),
+    "risk-disclosure":      (0.1, False, "risk-factor mention of the region"),
+    "boilerplate-mention":  (0.0, False, "incidental mention — drop from scoring"),
+}
+# Deterministic bridge: SS1/SS3 keyword deal_type -> SIGNAL_LABELS key (so news
+# events and filings feed R3 trigger-strength through one vocabulary).
+DEAL_TYPE_TO_LABEL = {
+    "JV": "jv-partnership", "partnership": "jv-partnership",
+    "acquisition": "acquisition", "supply-agreement": "customer-contract",
+    "capex": "capex-commitment", "facility-expansion": "expansion-existing",
+}
+
+# --- R1: company type (curated; role comes from the dc_classify rule table) --
+COMPANY_TYPES = {
+    "Hyperscaler":     ["AWS", "Amazon", "Microsoft", "Google", "Meta", "Oracle"],
+    "Indian-operator": WATCH_OPERATORS_INDIA + ["Web Werks", "Pi Datacenters", "ESDS",
+                        "Tata Communications", "Reliance", "Yotta"],
+    "Infra-investor":  ["Blackstone", "Brookfield", "GIC", "Keppel", "KKR", "Macquarie",
+                        "Kotak"],
+    "GCC-operator":    WATCH_OPERATORS_GCC + ["G42"],
+    # Foreign operators/platforms default to "Other" unless listed above; dc_classify
+    # treats "Other"+foreign as operator/platform for the Prospect rule.
+}
+
+# --- R2: source tiering (domain OR publisher-name -> tier; unknown => T3) ----
+# T1 = primary/official/wire-of-record. T2 = credible trade/business press.
+# T3 = SEO/retail/aggregator noise. Momentum weights applied in dc_score (M3).
+SOURCE_TIERS = {
+    # T1 — official / primary / global wire
+    "sec.gov": "T1", "pib.gov.in": "T1", "eprocure.gov.in": "T1", "data.gov.in": "T1",
+    "reuters.com": "T1", "bloomberg.com": "T1", "ft.com": "T1", "nikkei.com": "T1",
+    "apnews.com": "T1", "peeringdb.com": "T1", "sttelemediagdc.com": "T1",
+    "equinix.com": "T1", "nvidia.com": "T1", "qna.org.qa": "T1", "omannews.gov.om": "T1",
+    "sebi.gov.in": "T1", "boursakuwait.com.kw": "T1", "parivesh.nic.in": "T1",
+    "cci.gov.in": "T1", "moiat.gov.ae": "T1",
+    # T2 — credible trade/business press
+    "datacenterdynamics.com": "T2", "datacenterknowledge.com": "T2",
+    "datacenterfrontier.com": "T2", "economictimes.indiatimes.com": "T2",
+    "indiatimes.com": "T2", "business-standard.com": "T2", "moneycontrol.com": "T2",
+    "livemint.com": "T2", "financialexpress.com": "T2", "hindustantimes.com": "T2",
+    "thehindu.com": "T2", "medianama.com": "T2", "theregister.com": "T2",
+    "blocksandfiles.com": "T2", "prnewswire.com": "T2", "cset.georgetown.edu": "T2",
+    # T3 — noise (explicit; anything unknown also resolves to T3)
+    "whalesbook.com": "T3", "tradebrains.in": "T3", "bebeez.it": "T3",
+    "cryptobriefing.com": "T3", "vocal.media": "T3", "tradingview.com": "T3",
+    "invezz.com": "T3", "stocktwits.com": "T3",
+}
+SOURCE_TIER_DEFAULT = "T3"
+SOURCE_TIER_MOMENTUM_WEIGHTS = {"T1": 1.0, "T2": 0.8, "T3": 0.3}
+
+# --- R5: policy classes (keyword classifier; first match wins; default =
+# market-commentary which is EXCLUDED from policy_tailwind + heatmap) ----------
+POLICY_CLASSES = {
+    "state-DC-policy":       ["data centre policy", "data center policy", "dc policy",
+                              "state incentive", "maharashtra", "uttar pradesh", "telangana",
+                              "tamil nadu", "andhra pradesh", "odisha", "gujarat",
+                              "west bengal", "karnataka", "haryana"],
+    "power-open-access":     ["open access", "wheeling", "transmission", "tariff",
+                              "electricity duty", "captive power", "ppa", "discom",
+                              "distribution license"],
+    "land-env-water":        ["land allotment", "land subsidy", "zoning", "environment",
+                              "environmental clearance", "water", "crz", "parivesh"],
+    "data-localization-dpdp":["data localisation", "data localization", "dpdp",
+                              "data protection", "cybersecurity", "cert-in", "meity rules"],
+    "govt-scheme-incentive": ["pli", "scheme", "subsidy", "incentive", "grant",
+                              "mission", "budget allocation"],
+    "law-regulation":        ["bill", "act", "amendment", "notification", "gazette",
+                              "regulation", "sebi", "trai", "ordinance"],
+    # default class (no keywords — assigned when nothing above matches):
+    "market-commentary":     [],
+}
+POLICY_GENUINE_CLASSES = [k for k in POLICY_CLASSES if k != "market-commentary"]
+
+# --- R3: BD Priority factor weights + cutoffs (consumed by dc_bd in M7) ------
+# Composite 0-100; role gates: Noise=>Exclude, Market-signal/Case-study<=P3, all-T3<=P3.
+BD_FACTORS = {
+    "trigger_strength":  0.25,  # max SIGNAL_LABELS weight over verified signals × recency
+    "tag_fit":           0.15,  # role/type/stage rubric — TAG's realistic ability to help
+    "buyer_access":      0.15,  # accessibility rubric by company type
+    "cross_border":      0.10,  # foreign->India / GCC->India motion
+    "policy_exposure":   0.10,  # genuine policy classes relevant to layer/geo/state
+    "deal_size":         0.10,  # deal_value buckets merged with fee-viability scale
+    "timing":            0.10,  # recency of last signal
+    "source_confidence": 0.05,  # T1 share of the evidence mix
+}
+BD_PRIORITY_CUTOFFS = {"P1": 65, "P2": 40}   # >=P1 cut => P1, >=P2 cut => P2, else P3
+
+# --- Fee-viability inputs (computed ONLY for role Prospect/Partner, ~5-20 rows) ---
+# Backer scale: named backers/parents that clear TAG's fee bar on their own.
+BACKER_SCALE = {
+    "mega-fund":   ["Blackstone", "Brookfield", "GIC", "KKR", "Macquarie", "Keppel",
+                    "Kotak", "Mubadala", "ADIA", "PIF"],
+    "hyperscaler": ["AWS", "Amazon", "Microsoft", "Google", "Oracle", "Meta"],
+    "platform":    ["AirTrunk", "Vantage", "STACK Infrastructure", "EdgeConneX",
+                    "Princeton Digital", "Digital Realty", "Equinix", "NTT", "G42"],
+}
+FEE_VIABILITY_DEAL_USD = {"high": 500_000_000, "medium": 50_000_000}  # deal_value buckets
+
+# --- R7: Entity Overrides seed rows (appended once if absent; humans own the tab) ---
+# company -> (entity_match, india_presence, expansion_stage, note)
+PRESET_OVERRIDES = {
+    "STT GDC India": ("matched", "established", "scaling",
+                      "Operates 30+ India DCs; Chennai Siruseri 4th DC + INR 4,200 cr TN MoU (Feb 2026)"),
+}
+
+# --- R6: MD View curation ----------------------------------------------------
+CLUSTER_ACCOUNTS = {   # accounts presented as ONE clustered MD View row
+    "AirTrunk": {"with": "Blackstone", "label": "AirTrunk + Blackstone (platform + sponsor)"},
+}
+CASE_STUDY_NOTES = {   # role=Case-study framing notes (never pitched as prospects)
+    "Meta": "Meta↔Reliance JV — case-study of hyperscaler+Indian-partner structure, not a prospect",
+    "Amazon": "Anchor market-signal — validates India DC demand; not an accessible buyer",
+}
+
+# --- SS3 overhaul constants (M4; fetch/scoping constants live in section 5) ---
+EDGAR_DOC_CAP        = 16_000_000  # bytes; fetch cap for inline-XBRL 20-Fs (multi-MB)
+KWIC_WORDS           = EDGAR_SIGNAL_WORDS  # alias: ±words around each DC-term hit
+MAX_SIGNALS_PER_FILING = 12        # judge returns at most this many labeled signals
+KWIC_DEDUP_COSINE    = 0.90        # semantic near-dupe threshold (dc_models.embed)
+
+# --- M6: India state intelligence --------------------------------------------
+STATE_BANK_PATH = "knowledge/india_state_bank.md"   # source of truth (verbatim, sourced)
+STATE_BANK_STALE_DAYS = 90                          # warn when "Checked:" older than this
+CITY_STATE_MAP = {
+    "mumbai": "Maharashtra", "navi mumbai": "Maharashtra", "pune": "Maharashtra",
+    "visakhapatnam": "Andhra Pradesh", "vizag": "Andhra Pradesh",
+    "chennai": "Tamil Nadu", "siruseri": "Tamil Nadu", "ambattur": "Tamil Nadu",
+    "hosur": "Tamil Nadu", "thoothukudi": "Tamil Nadu",
+    "hyderabad": "Telangana",
+    "noida": "Uttar Pradesh", "greater noida": "Uttar Pradesh", "lucknow": "Uttar Pradesh",
+    "kanpur": "Uttar Pradesh", "varanasi": "Uttar Pradesh", "agra": "Uttar Pradesh",
+    "ghaziabad": "Uttar Pradesh",
+    "dholera": "Gujarat", "gift city": "Gujarat", "ahmedabad": "Gujarat",
+    "kolkata": "West Bengal", "new town": "West Bengal",
+    "bengaluru": "Karnataka", "bangalore": "Karnataka", "mangaluru": "Karnataka",
+    "mysuru": "Karnataka",
+    "gurugram": "Haryana", "gurgaon": "Haryana", "manesar": "Haryana",
+    "bhubaneswar": "Odisha", "khurda": "Odisha", "cuttack": "Odisha",
+    "shimla": "Himachal Pradesh", "kangra": "Himachal Pradesh",
+}
+
+# --- Sheet header freeze (append-only discipline; offline migration test) -----
+# dc_export self-check compares live writer headers against these frozen lists.
+# APPEND new columns at the END and update here in the same PR; any insert or
+# rename fails the self-check BEFORE a live write.
+EXPECTED_HEADERS = {}  # populated by dc_export._selfcheck from the writer modules (M1)
