@@ -204,48 +204,68 @@ def _sections_with_offsets(text):
     yield from spans
 
 
+def extract_signals(region, side=dc.EDGAR_SIGNAL_WORDS):
+    """KWIC signal catches: for every DC-term hit in `region`, take ±`side` words of context;
+    merge overlapping/adjacent intervals so clustered hits become one passage and isolated hits
+    stay ~2*side words. Returns a deduped list of VERBATIM passages — the candidate signal list
+    handed to the AI judge (which labels/filters them). Self-scaling: a DC-saturated 20-F yields
+    many merged passages, an incidental 8-K mention yields one. No AI, no hallucination here."""
+    word_spans = [(m.start(), m.group()) for m in re.finditer(r"\S+", region)]
+    if not word_spans:
+        return []
+    starts = [s for s, _ in word_spans]
+    words = [w for _, w in word_spans]
+    rl = region.lower()
+    hitchars = []
+    for term in dc.DC_TERMS:                 # terms kept as written ('colo ' keeps its space)
+        if not term.strip():
+            continue
+        j = 0
+        while True:
+            i = rl.find(term, j)
+            if i < 0:
+                break
+            hitchars.append(i)
+            j = i + 1
+    if not hitchars:
+        return []
+    import bisect
+    hit_words = sorted({bisect.bisect_right(starts, hc) - 1 for hc in hitchars})
+    intervals = []                           # merge [w-side, w+side] windows
+    for w in hit_words:
+        lo, hi = max(0, w - side), min(len(words) - 1, w + side)
+        if intervals and lo <= intervals[-1][1] + 1:
+            intervals[-1][1] = max(intervals[-1][1], hi)
+        else:
+            intervals.append([lo, hi])
+    return [" ".join(words[lo:hi + 1]) for lo, hi in intervals]
+
+
 def extract_evidence(text, form=""):
-    """Form-aware evidence extraction. Confine keyword flagging + the AI window to the search
-    region (20-F → Item 3-5, else whole doc). If the region fits the AI budget, send it whole
-    (no keyword gate — the judge decides); otherwise send a 4000-word window centered to cover
-    the DC keyword hits within the region."""
-    blank = {"evidence": "", "window_text": "", "section": "", "matched_terms": "",
+    """Form-aware evidence: confine to the search region (20-F → Item 3-5, else whole doc), then
+    build a deduped list of ±30-word KWIC signal passages around every DC keyword hit. The passage
+    list goes to the AI judge, which labels/filters them into material India/Gulf TAG signals.
+    Keyword fields (region/deal/layer/confidence) are kept for SS5 + the no-AI fallback."""
+    blank = {"evidence": "", "window_text": "", "passages": [], "section": "", "matched_terms": "",
              "deal_type": "", "counterparty_region": "", "confidence": "low", "layer": "General"}
     if not text:
         return blank
-    W = dc.EDGAR_EVIDENCE_WINDOW
-    budget = dc.EDGAR_AI_WHOLE_WORDS
-    side = budget // 2
-
     label, region = _search_region(text, form)
-    anchor, conf, cregion, geos, dc_hits = _pick_anchor(region)
-    region_words = len(region.split())
+    passages = extract_signals(region)
+    if not passages:                         # no DC term anywhere → not a data-centre filing
+        return blank
+    anchor, conf, cregion, geos, _dc_hits = _pick_anchor(region)
 
-    if region_words <= budget:
-        # Small region: hand the whole thing to the judge, keyword hit or not.
-        window, section = region, label
-        if anchor is None:
-            anchor = 0
-    else:
-        # Big region (e.g. Sify Item 3-5): require a DC hit, then window to cover the cluster.
-        if not dc_hits:
-            return blank
-        span_words = _words_between(region, dc_hits[0], dc_hits[-1])
-        center = ((dc_hits[0] + dc_hits[-1]) // 2) if span_words <= budget else (anchor or dc_hits[0])
-        window = _word_window(region, center, side)
-        section = label + " (windowed)"
-
-    # Keyword fields from the window (or the anchor's neighbourhood within it).
-    wl = window.lower()
+    src = " ".join(passages).lower()
     matched = sorted(
-        {term.strip() for term in dc.DC_TERMS + dc.ACTION_TERMS if term.strip() in wl}
-        | {kw for (_p, kw, _c) in geos if kw in wl})
-    deal = next((dt for term, dt in dc.DEAL_TYPE_TERMS if term in wl), "")
-    layer = "; ".join(dc_ingest.tag_layers(wl)) or "General"
-    snippet = region[max(0, anchor - 250):anchor + 350].strip()
-    return {"evidence": snippet, "window_text": window, "section": section,
-            "matched_terms": ", ".join(matched[:8]), "deal_type": deal,
-            "counterparty_region": cregion, "confidence": conf, "layer": layer}
+        {term.strip() for term in dc.DC_TERMS + dc.ACTION_TERMS if term.strip() in src}
+        | {kw for (_p, kw, _c) in geos if kw in src})
+    deal = next((dt for term, dt in dc.DEAL_TYPE_TERMS if term in src), "")
+    layer = "; ".join(dc_ingest.tag_layers(src)) or "General"
+    snippet = passages[0][:600].strip()      # fallback evidence if the judge doesn't run
+    return {"evidence": snippet, "window_text": " ".join(passages), "passages": passages,
+            "section": f"{label} ({len(passages)} catches)", "matched_terms": ", ".join(matched[:8]),
+            "deal_type": deal, "counterparty_region": cregion, "confidence": conf, "layer": layer}
 
 
 def fetch_filings(limit=None):
@@ -288,7 +308,8 @@ def fetch_filings(limit=None):
         r.update(ev)
     _attach_verdicts(rows)
     for r in rows:
-        r.pop("window_text", None)          # context was for the judge, not the sheet
+        r.pop("window_text", None)          # passages/context were for the judge, not the sheet
+        r.pop("passages", None)
     return rows, {"EDGAR FTS": len(rows)}
 
 
@@ -312,36 +333,41 @@ def _save_cache(c):
 
 
 def _attach_verdicts(rows):
-    """Judge each filing's evidence window once (filings are immutable → permanent cache).
-    Write-all gate: every row keeps a `relevance` verdict + `section`; the judge, when it
-    ran, overrides the brittle keyword guesses. Non-fatal — no key/failure leaves keyword
-    fields intact and relevance='(no AI verdict)'."""
+    """Judge each filing's KWIC passage list once (filings are immutable → permanent cache).
+    The judge returns up to ~12 material TAG signals; every returned quote is substring-verified
+    against the passages (anti-hallucination) and the survivors become the SS3 evidence cell as
+    `[label|region] quote` bullets. Write-all gate: every row keeps a `relevance` verdict.
+    Non-fatal — no key/failure leaves the keyword fallback snippet + '(no AI verdict)'."""
     import dc_ai
     cache = _load_cache()
     todo = [{"accession": r["accession"], "filer": r["filer"], "form": r["form"],
-             "section": r.get("section", ""), "matched_terms": r.get("matched_terms", ""),
+             "section": r.get("section", ""), "passages": r.get("passages", []),
              "window_text": r.get("window_text", "")}
-            for r in rows if r["accession"] not in cache and r.get("window_text")]
+            for r in rows if r["accession"] not in cache and (r.get("passages") or r.get("window_text"))]
     verdicts = dc_ai.judge_filings(todo)
     if verdicts:
         cache.update(verdicts)
         _save_cache(cache)
     for r in rows:
         v = cache.get(r["accession"])
-        if v:
-            yn = "yes" if v.get("relevant") else "no"
-            r["relevance"] = f"{yn} — {v.get('why', '')}".strip(" —")
-            r["confidence"] = v.get("confidence") or r.get("confidence", "low")
-            r["deal_type"] = v.get("deal_type") or r.get("deal_type", "")
-            if v.get("region"):
-                r["counterparty_region"] = v["region"]
-            if v.get("layer"):
-                r["layer"] = v["layer"]
-            quote = _verify_quote(v.get("evidence_quote", ""), r.get("window_text", ""))
-            if quote:                       # extractive quote wins the evidence cell
-                r["evidence"] = quote
-        else:
+        if not v:
             r.setdefault("relevance", "(no AI verdict)")
+            continue
+        source = r.get("window_text", "")   # = joined passages the judge saw
+        kept = []
+        for s in (v.get("signals") or []):
+            q = _verify_quote(s.get("quote", ""), source)
+            if q:
+                reg = s.get("region") or v.get("region") or ""
+                kept.append(f"[{s.get('label', 'signal')}|{reg}] {q[:200]}")
+        if kept:                            # verified signal bullets win the evidence cell
+            r["evidence"] = "  •  ".join(kept[:12])
+            r["deal_type"] = (v["signals"][0].get("label") or r.get("deal_type", ""))
+            r["confidence"] = "high" if len(kept) >= 3 else "med"
+        yn = "yes" if v.get("relevant") else "no"
+        r["relevance"] = f"{yn} — {len(kept)} signal(s)"
+        if v.get("region"):
+            r["counterparty_region"] = v["region"]
 
 
 def _verify_quote(quote, source):

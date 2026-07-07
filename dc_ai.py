@@ -312,33 +312,34 @@ def classify_tenders(candidates):
         return {}
 
 
-# --- SS3 filing relevance judge: grounded, section-aware, per-filing, non-fatal -----------
+# --- SS3 filing signal extractor: grounded, multi-signal, per-filing, non-fatal -----------
 JUDGE_SYSTEM = (
     "detailed thinking off\n\n"
-    "You judge whether ONE SEC filing excerpt is genuinely about a DATA-CENTRE facility, "
-    "deal, or investment located in INDIA or the GULF (UAE, Saudi Arabia, Qatar, Bahrain, "
-    "Kuwait, Oman). Use ONLY the excerpt text — do not invent facts or use outside knowledge.\n"
-    "NOT a data-centre signal (relevant=false): a bare list of country names, a telecom / "
-    "international-calling mention, generic risk-factor boilerplate about 'international "
-    "operations', a manufacturing plant, or a shell/SPAC merely named '... Acquisition Corp'. "
-    "The words 'data center' appearing far from any India/Gulf context do NOT make it relevant.\n"
-    "You are told which SECTION the excerpt came from (Risk Factors / Growth Outlook / Business "
-    "/ Other); treat Risk Factors and Growth Outlook as intentional forward-looking disclosure "
-    "and weight them higher than an incidental mention.\n"
+    "You are a business-development analyst for The Asia Group (TAG). You are given a NUMBERED "
+    "LIST of verbatim passages pulled from ONE SEC filing around data-centre keywords. Identify "
+    "which passages are MATERIAL signals about a DATA-CENTRE facility, deal, investment, "
+    "expansion, capacity, or policy exposure located in INDIA or the GULF (UAE, Saudi Arabia, "
+    "Qatar, Bahrain, Kuwait, Oman). Use ONLY the passage text — never invent facts.\n"
+    "DISCARD passages with no India/Gulf data-centre substance: generic risk boilerplate, "
+    "telecom/international-calling, bare country lists, a shell merely named '... Acquisition "
+    "Corp', or a data-centre mention outside India/the Gulf.\n"
+    "For EACH material passage, emit one object: its passage number `n`, a signal `label`, the "
+    "`region`, and a `quote` copied VERBATIM from that passage (exact characters, no paraphrase "
+    "or ellipsis). Merge duplicates — do not repeat the same signal.\n"
+    "Signal labels: market-entry, expansion, new-facility, capex, JV/partnership, MoU, "
+    "capacity/scaling, policy/regulatory, M&A, hiring, other.\n"
     "Output ONLY a JSON object, no prose:\n"
     '{"relevant":true|false,"region":"India|UAE|Saudi Arabia|Qatar|Bahrain|Kuwait|Oman|null",'
-    '"deal_type":"<short phrase or null>","layer":"Compute|Cooling|Power|Network|Colo|Build|General",'
-    '"confidence":"high|med|low","why":"<=20 words grounded in the excerpt",'
-    '"evidence_quote":"<the single most relevant sentence, copied VERBATIM from the excerpt — '
-    'exact characters, no paraphrasing or ellipsis; empty string if none>"}'
+    '"signals":[{"n":<passage number>,"label":"<label>","region":"<region>","quote":"<verbatim>"}]}'
+    "\nInclude only material signals (0 to ~12). relevant=true iff at least one such signal exists."
 )
 
 
 def judge_filings(candidates):
-    """candidates: [{'accession','filer','form','section','matched_terms','window_text'}]
-    -> {accession: {relevant,region,deal_type,layer,confidence,why}}. One call per filing
-    (immutable → caller caches permanently). Returns {} on no-key / connection-fail; skips
-    any single filing that errors. Non-fatal by contract."""
+    """candidates: [{'accession','filer','form','section','passages':[...],'window_text'}]
+    -> {accession: {relevant, region, signals:[{n,label,region,quote}]}}. One call per filing
+    (immutable → caller caches permanently). Returns {} on no-key / connection-fail; skips any
+    single filing that errors. Non-fatal by contract."""
     if not candidates:
         return {}
     key = os.environ.get("OPENROUTER_API_KEY")
@@ -350,12 +351,15 @@ def judge_filings(candidates):
         return {}
     out = {}
     for c in candidates:
+        passages = c.get("passages") or ([c["window_text"]] if c.get("window_text") else [])
+        if not passages:
+            continue
+        listing = "\n".join(f"[{i + 1}] {p[:1200]}" for i, p in enumerate(passages[:80]))
         user = (f"SECTION: {c.get('section') or 'Other'}\n"
-                f"FILER: {c.get('filer', '')} ({c.get('form', '')})\n"
-                f"KEYWORD MATCHES: {c.get('matched_terms', '')}\n\n"
-                f"EXCERPT:\n{(c.get('window_text') or '')[:60000]}")
+                f"FILER: {c.get('filer', '')} ({c.get('form', '')})\n\n"
+                f"PASSAGES:\n{listing}")[:400000]
         try:
-            o = _json_obj(_chat(key, JUDGE_SYSTEM, user, max_tokens=400, temperature=0.0))
+            o = _json_obj(_chat(key, JUDGE_SYSTEM, user, max_tokens=1500, temperature=0.0))
             if o:
                 out[c["accession"]] = o
         except Exception as e:

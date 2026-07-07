@@ -184,10 +184,16 @@ DEAL_TYPE_TERMS = [
     ("facility", "facility-expansion"), ("construction", "facility-expansion"),
 ]
 EDGAR_EVIDENCE_WINDOW = 500   # chars: DC↔geo↔action proximity for keyword "high" confidence
-EDGAR_AI_WHOLE_WORDS = 4000   # AI context budget: send the whole search-region to the judge at
-                              # or under this size; above it, send a 4000-word window (2000/side)
-                              # centered to cover the DC keyword hits. Governs both 8-K whole-doc
-                              # and the 20-F Item 3-5 window so nothing relevant gets clipped.
+EDGAR_AI_WHOLE_WORDS = 50000  # AI context budget: send the whole search-region to the judge at
+                              # or under this size; above it, window. Set high on purpose —
+                              # pure-play DC operators (e.g. Sify) saturate the ENTIRE 20-F Item
+                              # 3-5 block (~41k words) with data-center content, so a small window
+                              # drops ~85% of it (incl. the Item 4 facility descriptions). Nemotron
+                              # 128k ctx + no token cap → send the whole block, don't clip. Only a
+                              # genuinely enormous region falls through to windowing.
+EDGAR_SIGNAL_WORDS = 30       # KWIC: words of context each side of a DC keyword hit; overlapping
+                              # catches merge, so this self-scales (dense 20-F → paragraphs, lone
+                              # 8-K mention → ~60 words). The passage list is what the judge labels.
 EDGAR_MAX_DOCS = 25           # fetch+parse the N most-recent hits per run (perf cap)
 
 # Evidence section prioritization (2026-07-06): a filing mentions "data center" in many
