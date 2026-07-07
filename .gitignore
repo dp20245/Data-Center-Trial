@@ -16,3 +16,6 @@ venv/
 run.log
 *.log
 # mca_cache.json is committed (persisted across CI runs so MCA isn't re-resolved daily)
+
+# dashboard preview screenshots (local review only)
+dashboard/.preview-*.png

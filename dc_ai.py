@@ -474,19 +474,19 @@ def summarize(ss, tabs, computed, register=None):
             _write(ss, f"AI Summary — cached (data unchanged since {last_ts}) · model {cache.get('model')}",
                    last_good)
             print("  AI Summary -> cached (no change); no call made")
-            return
+            return last_good
 
         key = os.environ.get("OPENROUTER_API_KEY")
         if not key:
             _write(ss, f"⚠️ AI Summary — Didn't Work (no OPENROUTER_API_KEY). Last successful: {last_ts}", last_good)
             print("  AI Summary -> no key; Didn't Work")
-            return
+            return last_good
 
         ok, note, rem = test_connection(key)
         if not ok:
             _write(ss, f"⚠️ AI Summary — Didn't Work ({note}). Last successful: {last_ts}. Attempted {_now()}", last_good)
             print(f"  AI Summary -> connection test failed: {note}")
-            return
+            return last_good
 
         # AI writes ONLY prose; if it fails the tables are still built deterministically.
         obj = {}
@@ -513,5 +513,7 @@ def summarize(ss, tabs, computed, register=None):
             print("  AI Summary -> generated + cached (deterministic tables + AI prose)")
         else:
             print("  AI Summary -> deterministic tables written; AI prose retry next run")
+        return summary
     except Exception as e:
         print(f"  [ai] non-fatal error: {e}")
+        return None
