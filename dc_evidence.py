@@ -11,7 +11,44 @@ from datetime import datetime
 import dc_config as dc
 
 REGISTER_HEADER = ["evidence_id", "company", "date", "publisher", "source_type",
-                   "headline", "url", "geo", "layer", "confidence", "event_id"]
+                   "headline", "url", "geo", "layer", "confidence", "event_id",
+                   # Phase 4b (append-only):
+                   "source_tier"]
+
+
+_PLACEHOLDER_PUBS = {"publisher", "src", "source", ""}
+
+
+def source_tier(publisher, url=""):
+    """R2: publisher-name or URL-domain -> T1/T2/T3 via dc_config.SOURCE_TIERS.
+    Unknown => T3 (SOURCE_TIER_DEFAULT). Deterministic, no network."""
+    p = (publisher or "").strip().lower()
+    for key, tier in dc.SOURCE_TIERS.items():
+        k = key.lower()
+        if p and (p == k or p == k.split(".")[0] or k.startswith(p + ".")):
+            return tier
+    d = _domain(url).lower()
+    if d:
+        for key, tier in dc.SOURCE_TIERS.items():
+            k = key.lower()
+            if d == k or d.endswith("." + k):
+                return tier
+    # Publisher display names ("Reuters", "Economic Times") -> match against domains loosely
+    if p:
+        squash = p.replace(" ", "")
+        for key, tier in dc.SOURCE_TIERS.items():
+            stem = key.split(".")[0]
+            if len(stem) >= 5 and stem in squash:
+                return tier
+    return dc.SOURCE_TIER_DEFAULT
+
+
+def _publisher_or_domain(publisher, url, fallback=""):
+    """Never emit a placeholder publisher (the literal 'publisher' bug)."""
+    p = (publisher or "").strip()
+    if p.lower() in _PLACEHOLDER_PUBS:
+        p = ""
+    return p or _domain(url) or fallback
 
 
 def _domain(url):
@@ -48,12 +85,14 @@ def build_register(tabs, ranked=None):
 
     for r in tabs.get("ss1", []) + tabs.get("ss2", []):
         eid = r.get("id")
+        pub = _publisher_or_domain(r.get("source"), r.get("url", ""))
         put(eid, {"evidence_id": eid, "company": id2co.get(eid, ""),
                   "date": (r.get("date") or "")[:10],
-                  "publisher": r.get("source") or _domain(r.get("url", "")),
+                  "publisher": pub,
                   "source_type": "secondary", "headline": (r.get("title") or "")[:180],
                   "url": r.get("url", ""), "geo": r.get("geo", ""), "layer": r.get("layer", ""),
-                  "confidence": "med", "event_id": r.get("event_id", "")})
+                  "confidence": "med", "event_id": r.get("event_id", ""),
+                  "source_tier": source_tier(pub, r.get("url", ""))})
     for r in tabs.get("ss3", []):
         eid = r.get("accession")
         put(eid, {"evidence_id": eid, "company": id2co.get(eid, "") or r.get("filer", ""),
@@ -62,7 +101,7 @@ def build_register(tabs, ranked=None):
                   "headline": f"{r.get('filer', '')} {r.get('form', '')} — {r.get('deal_type', '')}".strip(" —"),
                   "url": r.get("url", ""), "geo": r.get("counterparty_region", ""),
                   "layer": r.get("layer", ""), "confidence": r.get("confidence", "med"),
-                  "event_id": ""})
+                  "event_id": "", "source_tier": "T1"})   # SEC filings are primary/official
     for r in tabs.get("ss4", []):
         eid = r.get("id")
         st = r.get("signal_type", "")
@@ -73,7 +112,8 @@ def build_register(tabs, ranked=None):
                   "source_type": "primary" if primary else "secondary",
                   "headline": (r.get("excerpt") or r.get("actor") or "")[:180],
                   "url": r.get("url", ""), "geo": r.get("geo", ""), "layer": r.get("layer", ""),
-                  "confidence": r.get("confidence", "low"), "event_id": ""})
+                  "confidence": r.get("confidence", "low"), "event_id": "",
+                  "source_tier": "T1" if primary else "T2"})   # tenders/facilities official; jobs/reddit T2
     return reg
 
 
@@ -123,5 +163,21 @@ def _selfcheck():
     print("dc_evidence self-check: OK")
 
 
+def _selfcheck_tiers():
+    # R2 fixtures
+    assert source_tier("", "https://www.sec.gov/Archives/x") == "T1"
+    assert source_tier("Reuters", "") == "T1"
+    assert source_tier("Data Center Dynamics", "https://www.datacenterdynamics.com/x") == "T2"
+    assert source_tier("Economic Times", "https://economictimes.indiatimes.com/x") == "T2"
+    assert source_tier("", "https://vocal.media/x") == "T3"
+    assert source_tier("Whalesbook", "") == "T3"
+    assert source_tier("Some Unknown Blog", "https://random-seo-site.biz/x") == "T3"
+    # placeholder publisher fix
+    assert _publisher_or_domain("publisher", "https://www.livemint.com/x") == "livemint.com"
+    assert _publisher_or_domain("", "", "PIB India") == "PIB India"
+    print("dc_evidence tier self-check: OK")
+
+
 if __name__ == "__main__":
     _selfcheck()
+    _selfcheck_tiers()

@@ -358,7 +358,7 @@ RECENT_MONTHS = 6
 
 # Bump when the Signal Score formula changes -> dashboard resets the Δ baseline so
 # deltas across formula versions aren't shown as real movement.
-SCORING_VERSION = "v2"   # v2: graded geo (India 1.0/GCC 0.5) + unique-event momentum
+SCORING_VERSION = "v3"   # v3: source-tier-weighted momentum + genuine-policy gate (R2+R5)
 ENTITY_OVERRIDES_TAB = "Entity Overrides"
 EVIDENCE_TAB    = "Evidence Register"   # every hash -> readable, clickable record
 BD_PIPELINE_TAB = "BD Pipeline"         # actionable India opportunities (P1/P2/P3)
@@ -486,10 +486,11 @@ SOURCE_TIER_MOMENTUM_WEIGHTS = {"T1": 1.0, "T2": 0.8, "T3": 0.3}
 # --- R5: policy classes (keyword classifier; first match wins; default =
 # market-commentary which is EXCLUDED from policy_tailwind + heatmap) ----------
 POLICY_CLASSES = {
+    # Bare state names are NOT keywords (a startup story mentioning "Karnataka"
+    # is not policy) — a state name only classifies when a policy co-keyword is
+    # also present (see POLICY_STATE_NAMES + classify_policy).
     "state-DC-policy":       ["data centre policy", "data center policy", "dc policy",
-                              "state incentive", "maharashtra", "uttar pradesh", "telangana",
-                              "tamil nadu", "andhra pradesh", "odisha", "gujarat",
-                              "west bengal", "karnataka", "haryana"],
+                              "state incentive"],
     "power-open-access":     ["open access", "wheeling", "transmission", "tariff",
                               "electricity duty", "captive power", "ppa", "discom",
                               "distribution license"],
@@ -505,6 +506,13 @@ POLICY_CLASSES = {
     "market-commentary":     [],
 }
 POLICY_GENUINE_CLASSES = [k for k in POLICY_CLASSES if k != "market-commentary"]
+# State names classify as state-DC-policy ONLY alongside one of these co-keywords:
+POLICY_STATE_NAMES = ["maharashtra", "uttar pradesh", "telangana", "tamil nadu",
+                      "andhra pradesh", "odisha", "gujarat", "west bengal",
+                      "karnataka", "haryana", "himachal", "uttarakhand"]
+POLICY_CO_KEYWORDS = ["policy", "incentive", "subsidy", "notified", "notification",
+                      "cabinet", "government order", "g.o.", "gazette", "exemption",
+                      "scheme", "single window", "essential service"]
 
 # --- R3: BD Priority factor weights + cutoffs (consumed by dc_bd in M7) ------
 # Composite 0-100; role gates: Noise=>Exclude, Market-signal/Case-study<=P3, all-T3<=P3.

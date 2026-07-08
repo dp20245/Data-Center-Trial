@@ -94,6 +94,8 @@ def tag_geo(text):
 def _gnews_publisher(entry, title):
     src = entry.get("source")
     pub = src.get("title", "") if isinstance(src, dict) else ""
+    if pub.strip().lower() in ("publisher", "source", "src"):
+        pub = ""                       # placeholder guard (the literal "publisher" bug)
     if pub and title.endswith(f" - {pub}"):
         title = title[: -(len(pub) + 3)]
     return pub, title
@@ -234,12 +236,29 @@ def fetch_newsdata():
     return rows, health
 
 
-# Policy source -> type flag for SS2.
+# Policy source -> type flag for SS2 (legacy display field; the scoring signal is
+# now `policy_class` from classify_policy — R5).
 _POLICY_TYPE = {
     "CSET Georgetown": "analysis",
     "PIB India": "legislation", "SEBI": "regulation",
     "Boursa Kuwait": "regulation", "Oman News Agency Economy": "legislation",
 }
+
+
+def classify_policy(title, summary=""):
+    """R5: keyword classifier over dc_config.POLICY_CLASSES (first match wins).
+    Default = market-commentary, which is EXCLUDED from policy_tailwind and the
+    policy heatmap — this replaces the old `.get(name, "regulation")` fallback
+    that mis-tagged every unmapped feed as regulation."""
+    text = f"{title or ''} {summary or ''}".lower()
+    # State name + policy co-keyword => state-DC-policy (bare state names never match)
+    if (any(s in text for s in dc.POLICY_STATE_NAMES)
+            and any(k in text for k in dc.POLICY_CO_KEYWORDS)):
+        return "state-DC-policy"
+    for cls, kws in dc.POLICY_CLASSES.items():
+        if any(k in text for k in kws):
+            return cls
+    return "market-commentary"
 
 
 def fetch_policy():
@@ -248,9 +267,14 @@ def fetch_policy():
     hints = {n: n.replace("GNews ", "").replace(" Policy", "").strip()
              for n in dc.POLICY_GNEWS_GEO}
     hints = {n: {"Saudi": "Saudi Arabia"}.get(v, v) for n, v in hints.items()}
-    return pull(feeds, geo_hints=hints,
-                type_of=lambda n: _POLICY_TYPE.get(n, "regulation"),
-                max_age_days=dc.RECENT_MONTHS * 30)
+    rows, health = pull(feeds, geo_hints=hints,
+                        type_of=lambda n: _POLICY_TYPE.get(n, ""),
+                        max_age_days=dc.RECENT_MONTHS * 30)
+    for r in rows:
+        r["policy_class"] = classify_policy(r.get("title"), r.get("summary"))
+        if not r.get("type"):          # unmapped feed: type mirrors the real class
+            r["type"] = "analysis" if r["policy_class"] == "market-commentary" else r["policy_class"]
+    return rows, health
 
 
 def fetch_reddit():
@@ -270,3 +294,20 @@ def dedup(rows, seen_ids):
         batch.add(r["id"]); headlines.add(norm)
         out.append(r)
     return out
+
+
+def _selfcheck_policy():
+    # R5 fixtures
+    assert classify_policy("India data centre market size to reach $12bn") == "market-commentary"
+    assert classify_policy("Maharashtra data centre policy incentive notified") == "state-DC-policy"
+    assert classify_policy("Karnataka startup raises funding near data hub") == "market-commentary"
+    assert classify_policy("Haryana cabinet notifies new data centre incentive") == "state-DC-policy"
+    assert classify_policy("Open access rules for captive power amended") == "power-open-access"
+    assert classify_policy("DPDP data protection rules for data localisation") == "data-localization-dpdp"
+    assert classify_policy("New PLI scheme announced for electronics") == "govt-scheme-incentive"
+    assert classify_policy("Gazette notification amends electricity act", "") in ("law-regulation", "power-open-access")
+    print("dc_ingest policy self-check: OK")
+
+
+if __name__ == "__main__":
+    _selfcheck_policy()
