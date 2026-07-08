@@ -149,6 +149,11 @@ def compute(tabs):
                    "monitor": "Watch"}
 
     def _tag_play(p):
+        # R4 gate: "India market-entry" only when dc_classify granted the whitespace
+        # label (direct India signal required). Other labels pass through as the play.
+        wl = p.get("whitespace_label")
+        if wl:
+            return wl if wl != "India expansion" else "India expansion"
         st = p.get("expansion_stage")
         if st in _STAGE_PLAY:
             return _STAGE_PLAY[st]
@@ -197,6 +202,8 @@ def compute(tabs):
         enriched.append(p)
 
     def _is_whitespace(p):
+        if p.get("role") == "Noise":           # Phase 4a: Noise never surfaces as a target
+            return False
         pres = p.get("india_presence")
         if pres:                               # presence known: not-yet-established = target
             return pres in ("announced", "no_known_presence", "unknown")
