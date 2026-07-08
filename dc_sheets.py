@@ -26,7 +26,9 @@ SS4_HEADER = ["id", "observed_date", "signal_type", "actor", "geo", "layer",
 SS5_HEADER = ["company", "cin", "india_status", "partner", "development_type",
               "layer", "geo", "score", "momentum", "policy_tailwind",
               "india_gcc_relevance", "partnership_strength", "last_signal",
-              "top_evidence_ids"]
+              "top_evidence_ids",
+              # Phase 4a (append-only -- update dc_export.FROZEN_HEADERS in the same PR):
+              "company_type", "role", "role_reason", "whitespace_label"]
 # CIN-keyed India company spine (Entities tab). SS5 links to it via `cin`.
 ENTITIES_HEADER = ["cin", "legal_name", "matched_as", "status", "ownership",
                    "listed", "nic_class", "state", "inc_year", "company_class",

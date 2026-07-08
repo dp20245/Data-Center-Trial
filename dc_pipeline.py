@@ -123,6 +123,22 @@ def main():
     except Exception as e:
         print(f"  [overrides] {e}")
         ov_rows = []
+    # R7: seed Entity Overrides with curated known-good rows (once; humans own the tab).
+    try:
+        have = {(r.get("company") or "").lower() for r in ov_rows}
+        seeds = []
+        from datetime import date as _date
+        for co, (match, pres, stage, note) in dc.PRESET_OVERRIDES.items():
+            if co.lower() not in have:
+                seeds.append([co, match, pres, stage, "", str(_date.today()), f"seeded: {note}"])
+        if seeds:
+            ws_ov = dc_sheets.get_tab(sheet, dc.ENTITY_OVERRIDES_TAB, ov_header)
+            dc_sheets._retry(ws_ov.append_rows, seeds, value_input_option="RAW")
+            ov_rows += [dict(zip(ov_header, s)) for s in seeds]
+            print(f"  Entity Overrides seeded -> {[s[0] for s in seeds]}")
+    except Exception as e:
+        print(f"  [overrides-seed] non-fatal error: {e}")
+
     overrides = dc_presence.load_overrides(ov_rows)
     for r in ranked:
         r.update(dc_presence.classify(r, a4, overrides))
@@ -153,6 +169,30 @@ def main():
                 r["presence_source"] = "ai"
                 applied += 1
         print(f"  Presence AI adjudicated -> {applied}/{len(amb)} ambiguous")
+
+    # Phase 4a (R1+R4): deterministic role/type + whitespace label per company; AI may
+    # only downgrade weak-reason Prospect/Partner rows (locked boundary, dc_classify).
+    import dc_classify
+    import dc_evidence as _ev
+    _reg_for_cls = _ev.build_register(
+        {"ss1": a1, "ss2": a2, "ss3": a3, "ss4": a4}, ranked)
+    for r in ranked:
+        r.update(dc_classify.classify_role(r, _reg_for_cls))
+    try:
+        import dc_ai as _ai
+        _evidx = _ai._ev_index({"ss1": a1, "ss2": a2, "ss3": a3, "ss4": a4})
+        _ev_by = {r["company"]: [_evidx[i] for i in
+                                 [x.strip() for x in (r.get("top_evidence_ids") or "").split(",") if x.strip()]
+                                 if i in _evidx][:6] for r in ranked}
+        down = dc_classify.ai_downgrade(ranked, _ev_by)
+        if down:
+            print(f"  Classify AI downgraded -> {down}")
+    except Exception as e:
+        print(f"  [classify-ai] non-fatal error: {e}")
+    roles = {}
+    for r in ranked:
+        roles[r["role"]] = roles.get(r["role"], 0) + 1
+    print(f"  Roles: {roles}")
 
     print(f"  SS5 -> {dc_sheets.write_ss5(sheet, ranked)} ranked operators")
     print(f"  Entities spine -> {dc_sheets.write_entities(sheet, list(entities.values()))} resolved")

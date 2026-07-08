@@ -187,6 +187,8 @@ def compile_context(tabs, c, register=None):
                  f"filings={p.get('partnership_strength', 0)} policy={p.get('policy_tailwind', 0)} "
                  f"play={p.get('tag_play')} foreign={p.get('is_foreign', False)} "
                  f"deal_value={p.get('deal_value') or '—'}")
+        L.append(f"  role: {p.get('role', '?')} ({p.get('company_type', '?')}) — "
+                 f"{p.get('role_reason', '')} | whitespace={p.get('whitespace_label', '?')}")
         L.append(f"  presence: entity_match={p.get('entity_match', '?')} "
                  f"india_presence={p.get('india_presence', '?')} "
                  f"expansion_stage={p.get('expansion_stage', '?')} "
@@ -403,7 +405,9 @@ _ANALYSIS_SYS = (
     "You are a TAG (The Asia Group) India business-development analyst. Using ONLY the DATA below "
     "(no outside facts, no invented numbers), write concise India-focused prose. You MAY add brief "
     "general background about a company that already appears in the DATA with a leading [context] "
-    "tag. Decide entry vs expansion from india_presence (established => expansion, NOT market-entry).\n"
+    "tag. Decide entry vs expansion from india_presence (established => expansion, NOT market-entry). "
+    "Respect each company's deterministic role: role=Market-signal, Noise, or Case-study must NEVER "
+    "be written as a pitch, prospect, or TAG opportunity — describe them as market context only.\n"
     "Output ONLY JSON:\n"
     '{"executive_read":"3-5 short sentences: where India activity concentrates (states/layers), the '
     'top India policy hook, the value-chain movers, and this run\'s foreign-hyperscaler India moves",'
