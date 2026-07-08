@@ -209,8 +209,11 @@ def ai_downgrade(rows, ev_by):
         v = results.get(r["company"], "keep")
         if v == "keep":
             continue
-        # LOCKED BOUNDARY: AI can only downgrade to these two roles. Anything else is dropped.
-        assert v in AI_ROLES_ALLOWED, f"AI returned disallowed role {v!r}"
+        # LOCKED BOUNDARY: AI can only downgrade to these two roles. Anything else is
+        # dropped (explicit check, not assert-only — survives `python -O`).
+        if v not in AI_ROLES_ALLOWED:
+            print(f"  [classify-ai] disallowed verdict {v!r} for {r['company']} — dropped")
+            continue
         applied[r["company"]] = v
         r["role"] = v
         r["role_reason"] += f" · 🤖AI-downgrade: {v}"

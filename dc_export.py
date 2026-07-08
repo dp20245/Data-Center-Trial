@@ -46,7 +46,8 @@ FROZEN_HEADERS = {
     "SS5_HEADER": ["company", "cin", "india_status", "partner", "development_type",
                    "layer", "geo", "score", "momentum", "policy_tailwind",
                    "india_gcc_relevance", "partnership_strength", "last_signal",
-                   "top_evidence_ids"],
+                   "top_evidence_ids",
+                   "company_type", "role", "role_reason", "whitespace_label"],
 }
 
 # Sanitation: none of these may appear anywhere in the exported JSON text.
