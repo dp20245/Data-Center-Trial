@@ -103,7 +103,7 @@ def _score_why(p):
 def compute(tabs):
     ss1, ss2, ss3, ss4, ss5 = (tabs.get(k, []) for k in ("ss1", "ss2", "ss3", "ss4", "ss5"))
     markets, layers = dc.MARKETS, list(dc.LAYERS)
-    ptypes = ["legislation", "regulation", "analysis"]
+    ptypes = list(dc.POLICY_GENUINE_CLASSES)   # R5: real classes; commentary excluded
 
     geo_hm = {m: {l: 0 for l in layers} for m in markets}
     for r in ss1 + ss3 + ss4:
@@ -117,8 +117,12 @@ def compute(tabs):
     policy_hm = {m: {t: 0 for t in ptypes} for m in markets}
     for r in ss2:
         g = _geo_of(r)
-        t = (r.get("type", "") or "").lower()
-        t = t if t in ptypes else "analysis"
+        t = (r.get("policy_class") or "").strip()
+        if not t:                                  # legacy rows: classify on the fly
+            import dc_ingest
+            t = dc_ingest.classify_policy(r.get("title"), r.get("summary"))
+        if t not in ptypes:                        # market-commentary et al: excluded
+            continue
         for m in markets:
             if _has(g, m):
                 policy_hm[m][t] += 1
@@ -187,7 +191,9 @@ def compute(tabs):
         p["fresh_7d"] = fresh
         p["link_url"] = next((ev_url[i] for i in ids if ev_url.get(i)), "")
         p["link_id"] = next((i for i in ids if ev_url.get(i)), "")   # for descriptive evidence label
-        p["tier"] = "T1" if float(p.get("score") or 0) >= 60 else "T2" if float(p.get("score") or 0) >= 40 else "T3"
+        sc = float(p.get("score") or 0)
+        p["signal_band"] = "Strong" if sc >= 60 else "Moderate" if sc >= 40 else "Weak"
+        p["tier"] = p["signal_band"]   # back-compat alias (T1/T2/T3 now means SOURCE tier only)
         p["tag_play"] = _tag_play(p)
         p["why_now"] = _why_now(p, fresh)
         pr = trend.get(p.get("company"))
@@ -325,10 +331,10 @@ def write(ss, c, register=None):
              w.get("score", ""), w.get("why_now", ""), _source(w)])
     add()
     add(["TOP PROSPECTS (SS5) — Signal Score + actionability"])
-    add(["tier", "company", "tag_play", "Signal Score", "score explanation", "Δ", "new",
+    add(["signal band", "company", "tag_play", "Signal Score", "score explanation", "Δ", "new",
          "india_presence", "expansion_stage", "why_now", "signals", "last_signal", "source"])
     for p in c["prospects"]:
-        add([p.get("tier", ""), p.get("company", ""), p.get("tag_play", ""), p.get("score", ""),
+        add([p.get("signal_band", ""), p.get("company", ""), p.get("tag_play", ""), p.get("score", ""),
              _score_why(p), _delta(p), p.get("new_ev", ""),
              p.get("india_presence", ""), p.get("expansion_stage", ""),
              p.get("why_now", ""), p.get("signals", ""), p.get("last_signal", ""),
@@ -347,7 +353,7 @@ def write(ss, c, register=None):
     guide = [
         ["SIGNAL SCORE GUIDE"],
         ["Signal Score 0–100 = Momentum 35% + India/GCC relevance 25% + Verified partnerships 20% + Company-linked policy 20%"],
-        ["Tiers: T1 ≥60 strong · T2 40–59 qualify · T3 <40 monitor   (signal strength, NOT 'act now' — actionability = BD Priority)"],
+        ["Signal band: Strong ≥60 · Moderate 40–59 · Weak <40  (signal strength, NOT 'act now'). T1/T2/T3 = SOURCE tiers (Evidence Register)"],
         [f"Δ = change vs last run, same scoring version ({dc.SCORING_VERSION}) · 'new' = first seen · 'reset' = formula changed"],
         ["India presence ≠ MCA match: established / announced / no-known-presence / unknown"],
         ["'score explanation' column = each component's points for that company"],
@@ -387,7 +393,7 @@ def _selfcheck():
     assert by["Khazna"]["score_delta"] == "new", by["Khazna"]["score_delta"]
     assert by["Yotta"]["score_delta"] == 2.0, by["Yotta"]["score_delta"]   # 62 - 60
     assert by["Yotta"]["new_ev"] == 1, by["Yotta"]["new_ev"]               # j1 is new, a1 seen
-    assert by["Yotta"]["tier"] == "T1" and by["Khazna"]["tier"] == "T2"
+    assert by["Yotta"]["signal_band"] == "Strong" and by["Khazna"]["signal_band"] == "Moderate"
     assert by["Yotta"]["link_url"] == "http://x/a1", by["Yotta"]["link_url"]
     # expansion_stage-driven tag_play mapping
     assert _tag_play_probe({"expansion_stage": "scaling"}) == "India expansion"

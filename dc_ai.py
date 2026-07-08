@@ -68,7 +68,7 @@ SYSTEM = (
     "table cell NEVER use the '|' character or a line break.\n\n"
     "RANKING — a pipe-delimited table, a header row then ONE row per company, highest-conviction "
     "first, EXACTLY these columns:\n"
-    "Rank | Company | Tier | Score Δ | India status | TAG play | Evidence\n"
+    "Rank | Company | Signal band | Score Δ | India status | TAG play | Evidence\n"
     "(TAG play ∈ India market-entry / India government-affairs / India partnership / India "
     "site-selection, and may carry a short rationale; Evidence = the ids/CIN backing that row.) "
     "No prose around the table.\n\n"
@@ -182,7 +182,7 @@ def compile_context(tabs, c, register=None):
             L.append("  entity: no MCA entity record (often a foreign parent) — presence is "
                      "decided by india_presence below, NOT by the missing MCA match")
         L.append(f"  momentum: score={p.get('score')} Δ{dtxt} new≤7d={p.get('fresh_7d', 0)} "
-                 f"tier={p.get('tier')} momentum={p.get('momentum')} last={p.get('last_signal')}")
+                 f"signal_band={p.get('signal_band')} momentum={p.get('momentum')} last={p.get('last_signal')}")
         L.append(f"  profile: layers={p.get('layer')} geo={p.get('geo')} signals=[{p.get('signals', '')}] "
                  f"filings={p.get('partnership_strength', 0)} policy={p.get('policy_tailwind', 0)} "
                  f"play={p.get('tag_play')} foreign={p.get('is_foreign', False)} "
@@ -440,9 +440,9 @@ def _ev_labels(p, register):
 
 
 def _build_ranking(movers, register):
-    lines = ["RANKING", "Rank | Company | Tier | Score Δ | India status | TAG play | Evidence"]
+    lines = ["RANKING", "Rank | Company | Signal band | Score Δ | India status | TAG play | Evidence"]
     for n, p in enumerate(sorted(movers, key=lambda x: float(x.get("score") or 0), reverse=True), 1):
-        lines.append(" | ".join([str(n), p.get("company", ""), p.get("tier", ""), _fmt_delta(p),
+        lines.append(" | ".join([str(n), p.get("company", ""), p.get("signal_band", ""), _fmt_delta(p),
                                   f"{p.get('india_presence', '?')}/{p.get('expansion_stage', '?')}",
                                   p.get("tag_play", ""), _ev_labels(p, register)]))
     return lines

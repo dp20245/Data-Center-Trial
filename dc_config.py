@@ -358,7 +358,7 @@ RECENT_MONTHS = 6
 
 # Bump when the Signal Score formula changes -> dashboard resets the Δ baseline so
 # deltas across formula versions aren't shown as real movement.
-SCORING_VERSION = "v2"   # v2: graded geo (India 1.0/GCC 0.5) + unique-event momentum
+SCORING_VERSION = "v3"   # v3: source-tier-weighted momentum + genuine-policy gate (R2+R5)
 ENTITY_OVERRIDES_TAB = "Entity Overrides"
 EVIDENCE_TAB    = "Evidence Register"   # every hash -> readable, clickable record
 BD_PIPELINE_TAB = "BD Pipeline"         # actionable India opportunities (P1/P2/P3)

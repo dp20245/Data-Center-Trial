@@ -47,6 +47,8 @@ def _india_relevant(r):
 
 
 def _priority(r):
+    if r.get("all_t3"):                 # R2: all-T3 evidence can never exceed P3
+        return "P3 Monitor"
     pres = r.get("india_presence")
     recent_trigger = bool(r.get("deal_value")) or int(r.get("partnership_strength") or 0) > 0
     if pres in ("established", "announced") and recent_trigger:

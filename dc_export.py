@@ -37,7 +37,8 @@ CONTRACT_KEYS = ["schema_version", "sector", "generated_at", "scoring_version",
 # append: update the frozen list in the same PR. Insert/rename fails _selfcheck.
 FROZEN_HEADERS = {
     "ARTICLE_HEADER": ["id", "date", "source", "layer", "geo", "title", "url",
-                       "summary", "sentiment", "entities", "type", "event_id"],
+                       "summary", "sentiment", "entities", "type", "event_id",
+                       "policy_class"],
     "SS3_HEADER": ["accession", "filed_date", "filer", "cik", "form",
                    "counterparty_region", "deal_type", "layer", "matched_terms",
                    "confidence", "section", "relevance", "evidence", "url"],
@@ -47,7 +48,8 @@ FROZEN_HEADERS = {
                    "layer", "geo", "score", "momentum", "policy_tailwind",
                    "india_gcc_relevance", "partnership_strength", "last_signal",
                    "top_evidence_ids",
-                   "company_type", "role", "role_reason", "whitespace_label"],
+                   "company_type", "role", "role_reason", "whitespace_label",
+                   "source_tier_mix"],
 }
 
 # Sanitation: none of these may appear anywhere in the exported JSON text.
@@ -84,6 +86,11 @@ def _clip(s, n):
 
 def _ids(csv):
     return [i.strip() for i in (csv or "").split(",") if i.strip()]
+
+
+def _tier(source, url):
+    import dc_evidence
+    return dc_evidence.source_tier(source, url or "")
 
 
 # --------------------------------------------------------------------------- build
@@ -159,7 +166,7 @@ def build(tabs, computed, register, pipe=None, gcc=None, md_rows=None,
         if len(g["articles"]) < 12:
             g["articles"].append({"id": r.get("id"), "title": _clip(r.get("title"), 200),
                                   "source": r.get("source"),
-                                  "source_tier": r.get("source_tier"),   # M3
+                                  "source_tier": _tier(r.get("source"), r.get("url")),
                                   "date": r.get("date"),
                                   "url": r.get("url"),
                                   "sentiment": r.get("sentiment") or None})
@@ -170,9 +177,9 @@ def build(tabs, computed, register, pipe=None, gcc=None, md_rows=None,
         g["n_sources"] = len({a["source"] for a in g["articles"] if a.get("source")})
 
     policy = [{"id": r.get("id"), "date": r.get("date"), "geo": r.get("geo"),
-               "policy_class": r.get("policy_class"),   # M3
+               "policy_class": r.get("policy_class") or None,
                "type": r.get("type"), "title": _clip(r.get("title"), 200),
-               "source": r.get("source"), "source_tier": r.get("source_tier"),
+               "source": r.get("source"), "source_tier": _tier(r.get("source"), r.get("url")),
                "url": r.get("url")}
               for r in sorted(ss2, key=lambda x: x.get("date") or "", reverse=True)[:CAP_SS2]]
 

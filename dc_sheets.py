@@ -16,7 +16,9 @@ import dc_config as dc
 
 # PRD §5 shared article schema (SS1 + SS2).
 ARTICLE_HEADER = ["id", "date", "source", "layer", "geo", "title", "url",
-                  "summary", "sentiment", "entities", "type", "event_id"]
+                  "summary", "sentiment", "entities", "type", "event_id",
+                  # Phase 4b (append-only): real policy class (SS2; blank on SS1)
+                  "policy_class"]
 SS1_HEADER = ARTICLE_HEADER  # back-compat
 SS3_HEADER = ["accession", "filed_date", "filer", "cik", "form",
               "counterparty_region", "deal_type", "layer", "matched_terms",
@@ -28,7 +30,9 @@ SS5_HEADER = ["company", "cin", "india_status", "partner", "development_type",
               "india_gcc_relevance", "partnership_strength", "last_signal",
               "top_evidence_ids",
               # Phase 4a (append-only -- update dc_export.FROZEN_HEADERS in the same PR):
-              "company_type", "role", "role_reason", "whitespace_label"]
+              "company_type", "role", "role_reason", "whitespace_label",
+              # Phase 4b (append-only): evidence source-tier mix, e.g. "T1:1 T2:4 T3:2"
+              "source_tier_mix"]
 # CIN-keyed India company spine (Entities tab). SS5 links to it via `cin`.
 ENTITIES_HEADER = ["cin", "legal_name", "matched_as", "status", "ownership",
                    "listed", "nic_class", "state", "inc_year", "company_class",
