@@ -174,6 +174,7 @@ def main():
         print(f"  [evidence] non-fatal error: {e}")
 
     # BD Pipeline (P1/P2/P3) + GCC Watch. Soft columns AI-drafted (grounded, marked, non-fatal).
+    pipe, gcc, md_rows = [], [], []
     try:
         evidx = dc_ai._ev_index(tabs)
         ev_by = {r["company"]: [evidx[i] for i in
@@ -190,16 +191,30 @@ def main():
                                        if i.strip()), "") for r in ranked}
         stats = (f"MD VIEW — India DC opportunities · {len(register)} evidence sources · "
                  f"{n_bd} pipeline entries · updated {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}")
-        print(f"  MD View -> {dc_md.write(sheet, dc_md.build(pipe, link_by, register), stats)} rows")
+        md_rows = dc_md.build(pipe, link_by, register)
+        print(f"  MD View -> {dc_md.write(sheet, md_rows, stats)} rows")
     except Exception as e:
         print(f"  [bd] non-fatal error: {e}")
 
+    computed, ai_text = {}, None
     try:
         computed = dc_dashboard.compute(tabs)
         print(f"  Dashboard -> {dc_dashboard.write(sheet, computed, register)} rows")
-        dc_ai.summarize(sheet, tabs, computed, register)
+        ai_text = dc_ai.summarize(sheet, tabs, computed, register)
     except Exception as e:
         print(f"  [dashboard/ai] non-fatal error: {e}")
+
+    # Dashboard data feed (dashboard/data.json -> Vercel). Non-fatal; validate()
+    # blocks a bad export so the previous data.json survives.
+    try:
+        import dc_export
+        health = {**h2, **h3, **hr, **hj}
+        data = dc_export.build(tabs, computed or {"movers": ranked}, register,
+                               pipe=pipe, gcc=gcc, md_rows=md_rows,
+                               ai_summary=ai_text, health=health)
+        dc_export.write(data)
+    except Exception as e:
+        print(f"  [export] non-fatal error: {e}")
 
 
 if __name__ == "__main__":

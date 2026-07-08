@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>TAG BD Intelligence — Data Centres</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.7.0/tabler-icons.min.css">
+<style>
+:root{--navy:#262B68;--navy-l:#343A82;--char:#2C2E3A;--acid:#B5D334;--acid-dk:#7E951F;
+--bg:#F5F6F8;--surface:#FFFFFF;--line:#E7E9EE;--line-2:#D8DBE3;
+--ink:#1C1E2A;--ink-2:#5A5F70;--ink-3:#8A8F9E;
+--pos:#1E9E6A;--pos-bg:#E7F5EE;--neg:#D6453D;--neg-bg:#FCEBEA;--neu:#6B7081;
+--sharp:#D6453D;--sharp-bg:#FCEBEA;--tact:#C77A12;--tact-bg:#FBF0DC;--strat:#2F6F8C;--strat-bg:#E4F0F5;
+--news:#3F3D9E;--policy:#9A6310;--talent:#1B7A4F;--capital:#15589C;--osint:#7A3FA0;--disc:#B0492E;
+--rail:62px;--rail-open:240px;}
+*{box-sizing:border-box;margin:0;padding:0}html,body{height:100%}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}a{color:inherit;text-decoration:none}
+
+#rail{position:fixed;top:0;left:0;bottom:0;width:var(--rail);background:var(--navy);z-index:40;display:flex;flex-direction:column;transition:width .22s cubic-bezier(.4,0,.2,1);overflow:hidden;border-right:1px solid rgba(255,255,255,.06)}
+#rail:hover{width:var(--rail-open);box-shadow:4px 0 24px rgba(20,22,45,.18)}
+.brand{height:58px;display:flex;align-items:center;gap:12px;padding:0 19px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.07)}
+.brand .mark{min-width:26px;width:26px;height:26px;border-radius:7px;background:var(--acid);display:flex;align-items:center;justify-content:center;color:var(--navy);font-weight:700;font-size:14px}
+.brand .wm{color:#fff;font-weight:600;font-size:15px;letter-spacing:.2px;white-space:nowrap;opacity:0;transition:opacity .18s}#rail:hover .brand .wm{opacity:1}
+.nav{flex:1;padding:10px 0;display:flex;flex-direction:column;gap:1px;overflow-y:auto}.nav::-webkit-scrollbar{width:0}
+.nsec{padding:14px 19px 6px;color:rgba(255,255,255,.32);font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;opacity:0;transition:opacity .18s}#rail:hover .nsec{opacity:1}
+.nlink{display:flex;align-items:center;gap:14px;height:42px;padding:0 19px;color:rgba(255,255,255,.66);white-space:nowrap;position:relative;transition:color .15s,background .15s;cursor:pointer}
+.nlink i{min-width:24px;font-size:20px;text-align:center}.nlink span{font-size:14px;font-weight:500;opacity:0;transition:opacity .18s}#rail:hover .nlink span{opacity:1}
+.nlink:hover{color:#fff;background:rgba(255,255,255,.05)}.nlink.on{color:#fff}
+.nlink.on::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;background:var(--acid);border-radius:0 3px 3px 0}.nlink.on i{color:var(--acid)}
+.nlink.soon{color:rgba(255,255,255,.36)}.nlink.soon:hover{color:rgba(255,255,255,.55)}
+.ndot{margin-left:auto;font-size:9px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:rgba(255,255,255,.3);opacity:0;transition:opacity .18s}#rail:hover .ndot{opacity:1}
+.nbadge{margin-left:auto;background:var(--acid);color:var(--navy);font-size:11px;font-weight:600;border-radius:9px;padding:1px 7px;opacity:0;transition:opacity .18s}#rail:hover .nbadge{opacity:1}
+.railfoot{flex-shrink:0;border-top:1px solid rgba(255,255,255,.07);padding:8px 0}
+
+#main{margin-left:var(--rail);min-height:100vh;display:flex;flex-direction:column}
+#topbar{height:58px;background:var(--char);display:flex;align-items:center;gap:18px;padding:0 26px;position:sticky;top:0;z-index:30;border-bottom:1px solid rgba(0,0,0,.2)}
+.crumb{color:rgba(255,255,255,.5);font-size:13px;display:flex;align-items:center;gap:7px}.crumb b{color:#fff;font-weight:600}.crumb .sep{opacity:.4}
+.crumb .clk{cursor:pointer}.crumb .clk:hover{color:#fff}
+.searchbox{margin-left:8px;flex:1;max-width:400px;height:35px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:8px;display:flex;align-items:center;gap:8px;padding:0 12px}
+.searchbox input{flex:1;background:none;border:none;outline:none;color:#fff;font-family:inherit;font-size:13px}.searchbox input::placeholder{color:rgba(255,255,255,.4)}.searchbox i{font-size:17px;color:rgba(255,255,255,.5)}
+.topspacer{flex:1}
+.fresh{font-size:11px;color:rgba(255,255,255,.45);font-family:'IBM Plex Mono',monospace;display:flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap}
+.fresh:hover{color:rgba(255,255,255,.8)}
+.fresh .fled{width:8px;height:8px;border-radius:50%;background:var(--pos)}.fresh .fled.warn{background:var(--tact)}
+.ticon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.7);font-size:19px;position:relative}.ticon:hover{background:rgba(255,255,255,.08);color:#fff}
+.dot{position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--acid);border:2px solid var(--char)}
+.avatar{width:34px;height:34px;border-radius:50%;background:var(--acid);color:var(--navy);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;cursor:pointer}
+
+#view{padding:28px 34px 64px;max-width:1340px;width:100%}
+.eyebrow{color:var(--acid-dk);font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:7px}
+.phead{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:12px}
+.phead h1{font-size:25px;font-weight:600;letter-spacing:-.4px}
+.psub{color:var(--ink-2);font-size:14px;margin-bottom:24px;max-width:800px}
+
+/* sector hero */
+.shero{display:flex;align-items:center;gap:18px;background:linear-gradient(110deg,var(--navy),var(--navy-l));border-radius:16px;padding:22px 26px;color:#fff;margin-bottom:24px;flex-wrap:wrap}
+.shero .sicon{width:54px;height:54px;border-radius:13px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--acid)}
+.shero h1{font-size:23px;font-weight:600;letter-spacing:-.3px}
+.shero p{color:rgba(255,255,255,.66);font-size:13px;margin-top:2px}
+.shero .sstats{margin-left:auto;display:flex;gap:26px}
+.shero .sstat{text-align:right}.shero .sstat .n{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;display:block}.shero .sstat .l{font-size:11px;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.5px}
+
+/* stream block grid */
+.blocks{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+@media(max-width:920px){.blocks{grid-template-columns:1fr}}
+.block{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:border-color .15s,box-shadow .15s}
+.block:hover{border-color:var(--line-2);box-shadow:0 3px 18px rgba(30,33,60,.07)}
+.bhead{display:flex;align-items:center;gap:12px;padding:15px 17px;cursor:pointer;border-bottom:1px solid var(--line)}
+.bhead:hover .bt{color:var(--navy)}
+.bicon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.bicon.news{background:#EDEDFA;color:var(--news)}.bicon.policy{background:#FBF1DE;color:var(--policy)}
+.bicon.ranked{background:#E6F4EC;color:var(--talent)}.bicon.pipeline{background:#E2EFFB;color:var(--capital)}
+.bicon.osint{background:#F3EAFA;color:var(--osint)}.bicon.disclosure{background:#FBEAE4;color:var(--disc)}
+.bmeta{flex:1;min-width:0}
+.bt{font-size:14px;font-weight:600;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.bt .sheet{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500;color:var(--ink-3);background:var(--bg);border-radius:4px;padding:1px 5px}
+.bsub{font-size:11px;color:var(--ink-3);margin-top:2px}
+.bstat{text-align:right;flex-shrink:0}
+.bstat .bn{font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600}
+.bstat .bl{font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.4px}
+.bchev{color:var(--ink-3);font-size:18px;flex-shrink:0}.bhead:hover .bchev{color:var(--navy)}
+.bbody{padding:6px 17px 14px;flex:1}
+.brow{display:flex;align-items:center;gap:10px;padding:9px 0;font-size:13px;border-bottom:1px solid var(--line)}.brow:last-child{border-bottom:none}
+.brow .bled{width:6px;height:30px;border-radius:3px;flex-shrink:0}
+.brow .bmain{flex:1;min-width:0}.brow .bh{color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;font-size:13px}
+.brow .bm{font-size:11px;color:var(--ink-3);margin-top:1px;display:flex;gap:9px;flex-wrap:wrap}.brow .bm .src{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--ink-2)}
+.brow .bsc{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;min-width:44px;text-align:right}
+.bstub{padding:16px;text-align:center;color:var(--ink-3);font-size:12px;line-height:1.6}
+.bfoot{padding:10px 17px;background:#FAFBFC;border-top:1px solid var(--line);font-size:12px;color:var(--navy);font-weight:500;display:flex;align-items:center;gap:6px;cursor:pointer}
+.bfoot:hover{background:#F4F5FA}.bfoot i{font-size:15px}
+
+/* status chips */
+.stchip{font-size:10px;font-weight:600;border-radius:5px;padding:1px 7px;letter-spacing:.3px}
+.stchip.live{background:var(--pos-bg);color:var(--pos)}.stchip.dev{background:var(--tact-bg);color:var(--tact)}.stchip.soon{background:var(--bg);color:var(--ink-3)}
+
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:14px;margin-bottom:24px}
+.metric{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.metric .lbl{color:var(--ink-3);font-size:12px;font-weight:500;display:flex;align-items:center;gap:6px}.metric .lbl i{font-size:15px}
+.metric .val{font-size:24px;font-weight:600;margin-top:8px;letter-spacing:-.5px}.metric .delta{font-size:12px;font-weight:500;margin-top:3px}
+.up{color:var(--pos)}.down{color:var(--neg)}.flat{color:var(--neu)}
+
+.shead{display:flex;align-items:center;justify-content:space-between;margin:28px 0 14px;flex-wrap:wrap;gap:10px}
+.shead h2{font-size:16px;font-weight:600;display:flex;align-items:center;gap:9px}.shead h2 i{font-size:18px;color:var(--ink-2)}
+.shead .sx{color:var(--ink-3);font-size:12px;font-weight:400}
+.chip{font-size:12px;font-weight:500;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 11px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;transition:all .12s}
+.chip:hover{border-color:var(--line-2);color:var(--ink)}
+
+/* sector card grid (home) */
+.scards{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:16px;margin-bottom:8px}
+.scard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;cursor:pointer;transition:border-color .15s,box-shadow .15s;position:relative}
+.scard:hover{border-color:var(--line-2);box-shadow:0 3px 18px rgba(30,33,60,.07)}
+.scard.soon{cursor:default;opacity:.72}.scard.soon:hover{box-shadow:none;border-color:var(--line)}
+.scard .ci{width:44px;height:44px;border-radius:11px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:23px;color:var(--navy);margin-bottom:13px}
+.scard h3{font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.scard p{font-size:12px;color:var(--ink-3);margin-top:4px;line-height:1.5}
+.scard .cstats{display:flex;gap:16px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line);flex-wrap:wrap}
+.scard .cst .n{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;display:block}.scard .cst .l{font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.4px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}.panel h3{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:14px}.panel h3 i{font-size:17px;color:var(--ink-2)}
+.trend{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}.trend:last-child{border-bottom:none}.trend .rank{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:var(--ink-3);min-width:18px}.trend .tn{flex:1;font-size:13px;font-weight:500;min-width:0}
+.soon-pg{background:var(--surface);border:1px dashed var(--line-2);border-radius:14px;padding:52px;text-align:center;color:var(--ink-2)}
+.soon-pg i.big{font-size:42px;color:var(--line-2);display:block;margin-bottom:14px}.soon-pg h3{font-size:18px;font-weight:600;color:var(--ink);margin-bottom:6px}.soon-pg p{max-width:460px;margin:0 auto;font-size:13px}
+.empty{padding:30px;text-align:center;color:var(--ink-3);font-size:13px}
+
+/* tags & chips */
+.tag{font-size:11px;font-weight:600;border-radius:6px;padding:2px 8px;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.tag.p1{background:var(--sharp-bg);color:var(--sharp)}.tag.p2{background:var(--tact-bg);color:var(--tact)}.tag.p3{background:var(--strat-bg);color:var(--strat)}
+.tag.strong{background:var(--pos-bg);color:var(--pos)}.tag.moderate{background:var(--tact-bg);color:var(--tact)}.tag.weak{background:var(--bg);color:var(--ink-3)}
+.tag.geo{background:#EFF0FB;color:var(--navy)}.tag.plain{background:var(--bg);color:var(--ink-2)}
+.tag.hi{background:var(--pos-bg);color:var(--pos)}.tag.md{background:var(--tact-bg);color:var(--tact)}.tag.lo{background:var(--bg);color:var(--ink-3)}
+.tag.foreign{background:#F3EAFA;color:var(--osint)}
+.aichip{font-size:10px;font-weight:600;color:var(--acid-dk);background:#F4F7E6;border-radius:4px;padding:1px 6px;margin-right:6px;letter-spacing:.3px;text-transform:uppercase;white-space:nowrap}
+
+/* tables */
+.twrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.matrix{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;min-width:640px}
+.matrix th{background:#FAFBFC;text-align:left;padding:12px 14px;font-size:11px;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--line);white-space:nowrap}
+.matrix th.sort{cursor:pointer;user-select:none}.matrix th.sort:hover{color:var(--navy)}
+.matrix th .sarr{font-size:10px;color:var(--navy)}
+.matrix td{padding:13px 14px;border-bottom:1px solid var(--line);vertical-align:middle}.matrix tr:last-child td{border-bottom:none}.matrix tbody tr:hover td{background:#FAFBFC}
+.cellh{font-weight:500;color:var(--ink);max-width:380px}
+.matrix a.ext{color:var(--ink-3);font-size:16px}.matrix a.ext:hover{color:var(--navy)}
+.matrix a.tlink{color:var(--ink);font-weight:500}.matrix a.tlink:hover{color:var(--navy);text-decoration:underline}
+.subrow td{background:#FAFBFC;padding:6px 14px 14px}
+.evtx{font-size:12px;font-weight:500;color:var(--ink-2);display:inline-flex;align-items:center;gap:5px;cursor:pointer}.evtx:hover{color:var(--navy)}.evtx i{transition:transform .18s}.evtx.open i{transform:rotate(180deg)}
+.cart{display:flex;align-items:center;gap:12px;padding:8px 0;font-size:13px;border-bottom:1px solid var(--line)}.cart:last-child{border-bottom:none}
+.cart .cs{font-size:11px;font-weight:600;color:var(--navy);min-width:88px;font-family:'IBM Plex Mono',monospace}.cart .ch{flex:1;color:var(--ink-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cart .cd{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-3);white-space:nowrap}.cart a{color:var(--ink-3);font-size:16px}.cart a:hover{color:var(--navy)}
+.qev{font-size:12.5px;color:var(--ink-2);line-height:1.55;background:var(--bg);border-radius:8px;padding:9px 11px;margin-top:6px;border-left:2px solid var(--line-2);font-style:italic;max-width:520px;white-space:pre-wrap}
+
+/* prospect cards */
+.pfeed{display:flex;flex-direction:column;gap:14px}
+.prospect{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;transition:border-color .15s,box-shadow .15s}.prospect:hover{border-color:var(--line-2);box-shadow:0 2px 16px rgba(30,33,60,.07)}
+.prospect.pri1{border-left:3px solid var(--sharp)}.prospect.pri2{border-left:3px solid var(--tact)}.prospect.pri3{border-left:3px solid var(--strat)}
+.ptop{display:flex;align-items:flex-start;gap:16px;padding:16px 18px 14px}.prank{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;color:var(--ink-3);min-width:30px;line-height:1.5}.pmain{flex:1;min-width:0}
+.pco{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.pco h3{font-size:17px;font-weight:600;letter-spacing:-.2px}
+.ptrigger{margin-top:10px;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);flex-wrap:wrap}.ptrigger .tk{font-weight:600;color:var(--navy);background:#EFF0FB;border-radius:6px;padding:2px 9px;font-size:12px;display:inline-flex;align-items:center;gap:5px}.ptrigger .tk i{font-size:14px}
+.pthesis{margin-top:11px;font-size:13px;color:var(--ink-2);line-height:1.6;max-width:680px}.pthesis b{color:var(--ink)}
+.pscore{width:184px;flex-shrink:0;border-left:1px solid var(--line);padding-left:16px;display:flex;flex-direction:column;gap:11px}
+.sblock .sl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-3);margin-bottom:3px;display:flex;justify-content:space-between}
+.sval2{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600}
+.pfoot{display:flex;align-items:center;gap:16px;padding:11px 18px;background:#FAFBFC;border-top:1px solid var(--line);flex-wrap:wrap}
+.fmeta{font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:6px}.fmeta b{font-family:'IBM Plex Mono',monospace;color:var(--ink);font-weight:600}.fmeta i{font-size:15px;color:var(--ink-3)}.fspace{flex:1}
+.fbtn{font-size:12px;font-weight:500;color:var(--navy);border:1px solid var(--line-2);border-radius:7px;padding:5px 11px;background:var(--surface);display:inline-flex;align-items:center;gap:5px}.fbtn:hover{background:var(--navy);color:#fff;border-color:var(--navy)}.fbtn i{font-size:15px}
+.evid{display:none;padding:0 18px 16px;border-top:1px dashed var(--line-2)}.evid.open{display:block}.evid .et{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-3);margin:14px 0 8px}
+.aigrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px}
+.aicell{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:12.5px;color:var(--ink-2);line-height:1.5}
+.aicell .al{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-3);display:flex;align-items:center;gap:6px;margin-bottom:3px}
+
+/* ai summary */
+.aipanel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px 24px}
+.aipanel pre{font-family:'IBM Plex Mono',monospace;font-size:12.5px;line-height:1.7;color:var(--ink);white-space:pre-wrap;word-break:break-word}
+.aimeta{display:flex;gap:14px;align-items:center;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+
+/* loading / error */
+.loadpg{padding:90px 30px;text-align:center;color:var(--ink-3)}
+.loadpg .spin{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--navy);border-radius:50%;margin:0 auto 18px;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.errpg{background:var(--neg-bg);border:1px solid #F2C9C6;border-radius:14px;padding:42px;text-align:center;color:var(--neg);max-width:640px;margin:60px auto}
+.errpg i{font-size:38px;display:block;margin-bottom:12px}.errpg h3{font-size:17px;font-weight:600;margin-bottom:6px}.errpg p{font-size:13px;color:#9E3832}
+.errpg .fbtn{margin-top:18px;border-color:#E4A8A4;color:var(--neg)}
+</style></head>
+<body>
+<aside id="rail">
+  <div class="brand"><div class="mark">T</div><div class="wm">TAG BD Intelligence</div></div>
+  <nav class="nav" id="nav">
+    <div class="nsec">BD workspace</div>
+    <a class="nlink on" data-view="home"><i class="ti ti-layout-dashboard"></i><span>Overview</span></a>
+    <a class="nlink" data-view="prospects"><i class="ti ti-target"></i><span>Prospects</span><span class="nbadge" id="pBadge"></span></a>
+    <a class="nlink" data-view="md"><i class="ti ti-clipboard-list"></i><span>MD View</span></a>
+    <a class="nlink" data-view="gcc"><i class="ti ti-world"></i><span>GCC Watch</span></a>
+    <a class="nlink" data-view="ai"><i class="ti ti-sparkles"></i><span>AI Summary</span></a>
+    <a class="nlink" data-view="health"><i class="ti ti-heart-rate-monitor"></i><span>Feed health</span></a>
+    <div class="nsec">Sectors</div>
+    <a class="nlink" data-sector="dc"><i class="ti ti-server-2"></i><span>Data Centres</span><span class="ndot">live</span></a>
+    <a class="nlink soon" data-sector="Energy"><i class="ti ti-bolt"></i><span>Energy</span><span class="ndot">soon</span></a>
+    <a class="nlink soon" data-sector="Defense"><i class="ti ti-shield"></i><span>Defense</span><span class="ndot">soon</span></a>
+    <div class="nsec">Targeting</div>
+    <a class="nlink soon" data-view="states"><i class="ti ti-map-pin"></i><span>State Targeting</span><span class="ndot">soon</span></a>
+  </nav>
+  <div class="railfoot"><a class="nlink"><i class="ti ti-settings"></i><span>Settings</span></a></div>
+</aside>
+<div id="main">
+  <header id="topbar">
+    <div class="crumb" id="crumb"><b>TAG</b></div>
+    <div class="searchbox"><i class="ti ti-search"></i><input placeholder="Search companies, signals, streams..."/></div>
+    <div class="topspacer"></div>
+    <div class="fresh" id="freshness" title="Feed health"></div>
+    <button class="ticon"><i class="ti ti-bell"></i><span class="dot"></span></button>
+    <div class="avatar">DP</div>
+  </header>
+  <main id="view"></main>
+</div>
+<script>
+'use strict';
+let DATA=null;
+
+/* ---------- helpers ---------- */
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function dash(v){return (v==null||v==='')?'<span style="color:var(--ink-3)">—</span>':esc(v);}
+function num(v,d){return (v==null||v==='')?'—':(typeof v==='number'?v.toFixed(d==null?0:d):esc(v));}
+function shortDate(s){if(!s)return'—';const p=String(s).split(' ')[0].split('-');if(p.length<3)return esc(s);const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return (M[parseInt(p[1],10)-1]||p[1])+' '+parseInt(p[2],10)+' '+p[0];}
+function extLink(url){return url?`<a class="ext" href="${esc(url)}" target="_blank" rel="noopener"><i class="ti ti-external-link"></i></a>`:'';}
+function titleLink(title,url){const t=esc(title||'—');return url?`<a class="tlink" href="${esc(url)}" target="_blank" rel="noopener">${t}</a>`:t;}
+function priCls(p){const m=/^P([123])/.exec(p||'');return m?('p'+m[1]):'plain';}
+function priBorder(p){const m=/^P([123])/.exec(p||'');return m?('pri'+m[1]):'';}
+function bandTag(b){return b?`<span class="tag ${esc(String(b).toLowerCase())}">${esc(b)}</span>`:'—';}
+function confTag(c){if(!c)return dash(null);const k=/^hi/i.test(c)?'hi':/^(me|md)/i.test(c)?'md':'lo';return `<span class="tag ${k}">${esc(c)}</span>`;}
+function metric(lbl,icon,val,delta,dir){return `<div class="metric"><div class="lbl"><i class="ti ${icon}"></i>${lbl}</div><div class="val mono">${val}</div><div class="delta ${dir||'flat'}">${delta||''}</div></div>`;}
+function emptyState(msg){return `<div class="empty"><i class="ti ti-inbox" style="font-size:26px;display:block;margin-bottom:8px;color:var(--line-2)"></i>${esc(msg)}</div>`;}
+function toggleEl(id,expId){const el=document.getElementById(id);if(el)el.style.display=el.style.display==='none'?'':'none';const x=document.getElementById(expId);if(x)x.classList.toggle('open');}
+
+/* ---------- sortable table engine ---------- */
+const TBL={};
+function renderTable(id,cols,rows,rowFn,defKey,defDir){
+  TBL[id]={cols,rows,rowFn,key:defKey||null,dir:defDir||-1};
+  return `<div class="twrap"><table class="matrix" id="${id}"><thead><tr>${cols.map((c,i)=>
+    `<th class="${c.key?'sort':''}" ${c.key?`onclick="sortTbl('${id}',${i})"`:''} ${c.style?`style="${c.style}"`:''}>${c.label}<span class="sarr" id="${id}-s${i}"></span></th>`).join('')}
+  </tr></thead><tbody id="${id}-b"></tbody></table></div>`;
+}
+function paintTbl(id){
+  const t=TBL[id];if(!t)return;
+  let rows=t.rows.slice();
+  if(t.key){rows.sort((a,b)=>{let x=a[t.key],y=b[t.key];if(x==null)x='';if(y==null)y='';
+    if(typeof x==='number'||typeof y==='number'){x=Number(x)||0;y=Number(y)||0;return (x-y)*t.dir;}
+    return String(x).localeCompare(String(y))*t.dir;});}
+  const b=document.getElementById(id+'-b');if(!b)return;
+  b.innerHTML=rows.map(t.rowFn).join('')||`<tr><td colspan="${t.cols.length}">${emptyState('No records in this run.')}</td></tr>`;
+  t.cols.forEach((c,i)=>{const s=document.getElementById(id+'-s'+i);if(s)s.textContent=(c.key&&c.key===t.key)?(t.dir>0?' ▲':' ▼'):'';});
+}
+function sortTbl(id,i){const t=TBL[id];const c=t.cols[i];if(!c.key)return;if(t.key===c.key)t.dir=-t.dir;else{t.key=c.key;t.dir=-1;}paintTbl(id);}
+
+/* ---------- streams meta ---------- */
+const STREAMS=[
+ {key:'news',sheet:'SS1',name:'Sector News',icon:'ti-news',cls:'news',desc:'Grouped events from the daily news scan',get:()=>DATA.events,unit:'events'},
+ {key:'policy',sheet:'SS2',name:'Policy Shifts',icon:'ti-gavel',cls:'policy',desc:'State & central incentives, rules, land / power policy',get:()=>DATA.policy,unit:'items'},
+ {key:'disclosure',sheet:'SS3',name:'Disclosures',icon:'ti-file-certificate',cls:'disclosure',desc:'SEC filings with India / GCC data-centre intent',get:()=>DATA.disclosures,unit:'filings'},
+ {key:'osint',sheet:'SS4',name:'OSINT Signals',icon:'ti-satellite',cls:'osint',desc:'Jobs, tenders, land records & other open-source intent',get:()=>DATA.osint,unit:'signals'},
+ {key:'ranked',sheet:'SS5',name:'Ranked Operators',icon:'ti-chart-bar',cls:'ranked',desc:'Operators scored on signal momentum & policy tailwind',get:()=>DATA.prospects,unit:'operators'},
+ {key:'pipeline',sheet:'BD',name:'BD Pipeline',icon:'ti-target-arrow',cls:'pipeline',desc:'Prioritised accounts — P1 act now / P2 monitor / P3 park',get:()=>DATA.prospects.filter(p=>p.bd_priority),unit:'accounts'},
+];
+
+/* ---------- OVERVIEW ---------- */
+function viewHome(){
+  const k=DATA.kpis||{};
+  const dcStats=`<div class="cstats">
+    <div class="cst"><span class="n">${k.operators_ranked??'—'}</span><span class="l">Ranked</span></div>
+    <div class="cst"><span class="n">${k.prospects_p1??'—'}</span><span class="l">P1</span></div>
+    <div class="cst"><span class="n">${k.events_active??'—'}</span><span class="l">Events</span></div>
+    <div class="cst"><span class="n">${(k.feeds_live??'—')+'/'+(k.feeds_total??'—')}</span><span class="l">Feeds</span></div></div>`;
+  const soonCard=(name,icon,desc)=>`<div class="scard soon"><div class="ci"><i class="ti ${icon}"></i></div>
+    <h3>${name} <span class="stchip soon">Soon</span></h3><p>${desc}</p>
+    <div class="cstats"><div class="cst"><span class="n" style="color:var(--ink-3)">—</span><span class="l">Scoped</span></div></div></div>`;
+  const emphasis=(DATA.emphasis||[]);
+  return `<div class="eyebrow">Daily intelligence run · ${esc(DATA.generated_at||'')}</div>
+  <div class="phead"><h1>BD Intelligence Overview</h1></div>
+  <p class="psub">${esc(DATA.sector&&DATA.sector.thesis||'')} Six data streams feed the prospect engine; Data Centres is live, further sectors are scoped.</p>
+  <div class="shead" style="margin-top:6px"><h2><i class="ti ti-category-2"></i>Sectors</h2><span class="sx">Click the live sector to open its data streams</span></div>
+  <div class="scards">
+    <div class="scard" onclick="openSector('dc')"><div class="ci"><i class="ti ti-server-2"></i></div>
+      <h3>${esc(DATA.sector&&DATA.sector.name||'Data Centres')} <span class="stchip live">Live</span></h3>
+      <p>Power, land, state policy &amp; partner selection across India + GCC</p>${dcStats}</div>
+    ${soonCard('Energy','ti-bolt','Oil, gas, power, renewables & smart infra')}
+    ${soonCard('Defense','ti-shield','Aerospace, procurement & indigenisation')}
+  </div>
+  <div class="shead"><h2><i class="ti ti-gauge"></i>This run</h2></div>
+  <div class="metrics">
+    ${metric('Operators ranked','ti-chart-bar',k.operators_ranked??'—','signal-scored')}
+    ${metric('P1 accounts','ti-flame',k.prospects_p1??'—','act now')}
+    ${metric('Pipeline total','ti-target',k.pipeline_total??'—','BD accounts')}
+    ${metric('Active events','ti-bolt',k.events_active??'—','grouped news')}
+    ${metric('Evidence items','ti-files',k.evidence_total??'—','in register')}
+    ${metric('Feeds live','ti-rss',(k.feeds_live??'—')+' / '+(k.feeds_total??'—'),'pipeline health')}
+  </div>
+  <div class="shead"><h2><i class="ti ti-bulb"></i>Areas of emphasis</h2><span class="sx">Auto-generated from this run's signals</span></div>
+  <div class="panel">${emphasis.length?emphasis.map((e,i)=>`<div class="trend"><span class="rank">${i+1}</span><span class="tn">${esc(e)}</span></div>`).join(''):emptyState('No emphasis items this run.')}</div>`;
+}
+
+/* ---------- SECTOR PAGE ---------- */
+function heroDC(){
+  const nP=(DATA.prospects||[]).length,nE=(DATA.events||[]).length,nEv=Object.keys(DATA.evidence_register||{}).length;
+  return `<div class="shero"><div class="sicon"><i class="ti ti-server-2"></i></div>
+    <div><h1>${esc(DATA.sector&&DATA.sector.name||'Data Centres')}</h1><p>${esc(DATA.sector&&DATA.sector.thesis||'')}</p></div>
+    <div class="sstats">
+      <div class="sstat"><span class="n">${nP}</span><span class="l">Prospects</span></div>
+      <div class="sstat"><span class="n">${nE}</span><span class="l">Events</span></div>
+      <div class="sstat"><span class="n">${nEv}</span><span class="l">Evidence</span></div>
+    </div></div>`;
+}
+function previewRow(led,head,meta,right){
+  return `<div class="brow"><div class="bled" style="background:${led}"></div><div class="bmain"><div class="bh">${head}</div><div class="bm">${meta}</div></div>${right?`<div class="bsc">${right}</div>`:''}</div>`;
+}
+function streamPreview(key){
+  const N=5;
+  if(key==='news')return (DATA.events||[]).slice(0,N).map(e=>previewRow('var(--news)',esc(e.headline),`<span class="src">${e.n_sources||0} src</span><span>${e.n_articles||0} articles</span><span>${shortDate(e.last_seen)}</span>`,esc(e.geo||''))).join('');
+  if(key==='policy')return (DATA.policy||[]).slice(0,N).map(p=>previewRow('var(--policy)',esc(p.title),`<span class="src">${esc(p.source||'—')}</span><span>${shortDate(p.date)}</span><span>${esc(p.geo||'')}</span>`,esc(p.policy_class||p.type||''))).join('');
+  if(key==='disclosure')return (DATA.disclosures||[]).slice(0,N).map(d=>previewRow('var(--disc)',esc(d.filer),`<span class="src">${esc(d.form||'—')}</span><span>${shortDate(d.filed_date)}</span><span>${esc(d.region||'')}</span>`,esc(d.deal_type||''))).join('');
+  if(key==='osint')return (DATA.osint||[]).slice(0,N).map(o=>previewRow('var(--osint)',esc(o.excerpt||o.actor),`<span class="src">${esc(o.signal_type||'—')}</span><span>${esc(o.actor||'')}</span><span>${shortDate(o.date)}</span>`,esc(o.geo||''))).join('');
+  if(key==='ranked')return (DATA.prospects||[]).slice().sort((a,b)=>(b.signal_score||0)-(a.signal_score||0)).slice(0,N).map(p=>previewRow('var(--talent)',esc(p.company),`<span class="src">${esc(p.signal_band||'')}</span><span>${esc(p.geo||'')}</span><span>${esc(p.tag_play||'')}</span>`,num(p.signal_score,0))).join('');
+  if(key==='pipeline'){
+    const bd=(DATA.prospects||[]).filter(p=>p.bd_priority);
+    const groups=['P1','P2','P3'].map(g=>({g,rows:bd.filter(p=>String(p.bd_priority).startsWith(g))})).filter(x=>x.rows.length);
+    return groups.map(x=>x.rows.slice(0,2).map(p=>previewRow(x.g==='P1'?'var(--sharp)':x.g==='P2'?'var(--tact)':'var(--strat)',esc(p.company),`<span class="src">${esc(p.bd_priority)}</span><span>${esc(p.india_stage||'')}</span>`,esc(p.deal_value||''))).join('')).join('');
+  }
+  return '';
+}
+function viewSectorDC(){
+  return `${heroDC()}
+  <div class="shead" style="margin-top:0"><h2><i class="ti ti-stack-2"></i>Data streams</h2><span class="sx">Click any heading to open the full stream</span></div>
+  <div class="blocks">${STREAMS.map(s=>{
+    const rows=s.get()||[];const preview=streamPreview(s.key)||`<div class="bstub">No ${s.name.toLowerCase()} in this run.</div>`;
+    return `<div class="block">
+      <div class="bhead" onclick="openStream('${s.key}')">
+        <div class="bicon ${s.cls}"><i class="ti ${s.icon}"></i></div>
+        <div class="bmeta"><div class="bt">${s.name} <span class="sheet">${s.sheet}</span> <span class="stchip live">Live</span></div><div class="bsub">${s.desc}</div></div>
+        <div class="bstat"><div class="bn">${rows.length}</div><div class="bl">${s.unit}</div></div>
+        <i class="ti ti-chevron-right bchev"></i></div>
+      <div class="bbody">${preview}</div>
+      <div class="bfoot" onclick="openStream('${s.key}')"><i class="ti ti-arrow-right"></i>Open ${s.name}</div></div>`;
+  }).join('')}</div>`;
+}
+
+/* ---------- STREAM DETAIL VIEWS ---------- */
+function streamHero(s,n){
+  return `<div class="shero"><div class="sicon"><i class="ti ${s.icon}"></i></div>
+    <div><h1>Data Centres · ${s.name}</h1><p>${s.sheet} · ${s.desc}</p></div>
+    <div class="sstats"><div class="sstat"><span class="n">${n}</span><span class="l">${s.unit}</span></div></div></div>`;
+}
+function viewStreamNews(s){
+  const rows=(DATA.events||[]).map((e,i)=>Object.assign({_i:i},e));
+  const cols=[{label:'Event',key:'headline',style:'width:40%'},{label:'Articles',key:'n_articles'},{label:'Sources',key:'n_sources'},{label:'Layer',key:'layer'},{label:'Geo',key:'geo'},{label:'Last seen',key:'last_seen'},{label:''}];
+  const rowFn=e=>{
+    const arts=(e.articles||[]).map(a=>`<div class="cart"><div class="cs">${esc(a.source||'—')}</div><div class="ch" title="${esc(a.title)}">${titleLink(a.title,a.url)}</div><div class="cd">${shortDate(a.date)}</div>${extLink(a.url)||'<span style="width:16px"></span>'}</div>`).join('');
+    return `<tr><td class="cellh"><b>${esc(e.headline||'—')}</b><div style="margin-top:5px"><span class="evtx" id="exp-ev${e._i}" onclick="toggleEl('sub-ev${e._i}','exp-ev${e._i}')"><i class="ti ti-chevron-down"></i>${(e.articles||[]).length} source articles</span></div></td>
+      <td class="mono">${e.n_articles??'—'}</td><td class="mono">${e.n_sources??'—'}</td><td>${dash(e.layer)}</td><td><span class="tag geo">${esc(e.geo||'—')}</span></td><td class="mono">${shortDate(e.last_seen)}</td><td>${esc(e.event_id||'')}</td></tr>
+    <tr id="sub-ev${e._i}" class="subrow" style="display:none"><td colspan="7">${arts||emptyState('No linked articles.')}</td></tr>`;
+  };
+  return streamHero(s,rows.length)+renderTable('tblNews',cols,rows,rowFn,'last_seen');
+}
+function viewStreamPolicy(s){
+  const rows=DATA.policy||[];
+  const cols=[{label:'Date',key:'date'},{label:'Geo',key:'geo'},{label:'Type',key:'type'},{label:'Title',key:'title',style:'width:44%'},{label:'Source',key:'source'},{label:''}];
+  const rowFn=p=>`<tr><td class="mono">${shortDate(p.date)}</td><td><span class="tag geo">${esc(p.geo||'—')}</span></td>
+    <td><span class="tag plain">${esc(p.policy_class||p.type||'—')}</span></td>
+    <td class="cellh">${titleLink(p.title,p.url)}</td><td>${dash(p.source)}</td><td>${extLink(p.url)}</td></tr>`;
+  return streamHero(s,rows.length)+renderTable('tblPolicy',cols,rows,rowFn,'date');
+}
+function viewStreamDisclosure(s){
+  const rows=DATA.disclosures||[];
+  const cols=[{label:'Filed',key:'filed_date'},{label:'Filer',key:'filer'},{label:'Form',key:'form'},{label:'Region',key:'region'},{label:'Deal type',key:'deal_type'},{label:'Confidence',key:'confidence'},{label:'Relevance & evidence',style:'width:36%'},{label:''}];
+  const rowFn=d=>`<tr><td class="mono">${shortDate(d.filed_date)}</td><td class="cellh"><b>${esc(d.filer||'—')}</b>${d.signals?`<div style="margin-top:4px"><span class="tag plain">${esc(d.signals)}</span></div>`:''}</td>
+    <td><span class="tag plain mono">${esc(d.form||'—')}</span></td><td>${dash(d.region)}</td><td>${dash(d.deal_type)}</td><td>${confTag(d.confidence)}</td>
+    <td>${dash(d.relevance)}${d.evidence?`<div class="qev">${esc(d.evidence)}</div>`:''}</td><td>${extLink(d.url)}</td></tr>`;
+  return streamHero(s,rows.length)+renderTable('tblDisc',cols,rows,rowFn,'filed_date');
+}
+function viewStreamOsint(s){
+  const rows=DATA.osint||[];
+  const cols=[{label:'Date',key:'date'},{label:'Signal type',key:'signal_type'},{label:'Actor',key:'actor'},{label:'Geo',key:'geo'},{label:'Excerpt',style:'width:40%'},{label:'Confidence',key:'confidence'},{label:''}];
+  const rowFn=o=>`<tr><td class="mono">${shortDate(o.date)}</td><td><span class="tag plain">${esc(o.signal_type||'—')}</span></td>
+    <td class="cellh"><b>${esc(o.actor||'—')}</b></td><td><span class="tag geo">${esc(o.geo||'—')}</span></td>
+    <td>${dash(o.excerpt)}</td><td>${confTag(o.confidence)}</td><td>${extLink(o.url)}</td></tr>`;
+  return streamHero(s,rows.length)+renderTable('tblOsint',cols,rows,rowFn,'date');
+}
+function viewStreamRanked(s){
+  const rows=(DATA.prospects||[]).slice().sort((a,b)=>(b.signal_score||0)-(a.signal_score||0));
+  const cols=[{label:'Company',key:'company'},{label:'Score',key:'signal_score'},{label:'Momentum',key:'momentum'},{label:'Geo',key:'geo'},{label:'Presence / stage',key:'india_presence'},{label:'TAG play',key:'tag_play'},{label:'Why now',style:'width:18%'},{label:'Deal value',key:'deal_value'}];
+  const rowFn=p=>`<tr><td class="cellh"><b>${esc(p.company)}</b>${p.is_foreign?' <span class="tag foreign">foreign</span>':''}</td>
+    <td><span class="mono" style="font-weight:600">${num(p.signal_score,0)}</span> ${bandTag(p.signal_band)}</td>
+    <td class="mono">${num(p.momentum,1)}</td><td><span class="tag geo">${esc(p.geo||'—')}</span></td>
+    <td>${dash(p.india_presence)}${p.expansion_stage?` <span style="color:var(--ink-3)">/ ${esc(p.expansion_stage)}</span>`:''}</td>
+    <td>${dash(p.tag_play)}</td><td style="font-size:12px;color:var(--ink-2)">${dash(p.why_now)}</td><td class="mono">${dash(p.deal_value)}</td></tr>`;
+  return streamHero(s,rows.length)+renderTable('tblRank',cols,rows,rowFn,'signal_score');
+}
+function viewStreamPipeline(s){
+  const bd=(DATA.prospects||[]).filter(p=>p.bd_priority);
+  let html=streamHero(s,bd.length);
+  const groups=[['P1','Act now','ti-flame'],['P2','Monitor','ti-eye'],['P3','Park','ti-clock']];
+  let any=false;
+  groups.forEach(([g,lbl,icon],gi)=>{
+    const rows=bd.filter(p=>String(p.bd_priority).startsWith(g));if(!rows.length)return;any=true;
+    const cols=[{label:'Company',key:'company'},{label:'Priority',key:'bd_priority'},{label:'India stage',key:'india_stage'},{label:'Trigger',style:'width:26%'},{label:'Why now'},{label:'Confidence',key:'confidence'},{label:'Deal value',key:'deal_value'}];
+    const rowFn=p=>`<tr><td class="cellh"><b>${esc(p.company)}</b></td><td><span class="tag ${priCls(p.bd_priority)}">${esc(p.bd_priority)}</span></td>
+      <td>${dash(p.india_stage)}</td><td style="font-size:12px">${dash(p.trigger)}</td><td style="font-size:12px;color:var(--ink-2)">${dash(p.why_now)}</td>
+      <td>${confTag(p.confidence)}</td><td class="mono">${dash(p.deal_value)}</td></tr>`;
+    html+=`<div class="shead"><h2><i class="ti ${icon}"></i>${g} — ${lbl}<span class="sx">${rows.length} account${rows.length>1?'s':''}</span></h2></div>`+renderTable('tblBD'+gi,cols,rows,rowFn,null);
+  });
+  if(!any)html+=`<div class="panel">${emptyState('No prioritised accounts in this run.')}</div>`;
+  return html;
+}
+function viewStream(key){
+  const s=STREAMS.find(x=>x.key===key);
+  if(key==='news')return viewStreamNews(s);
+  if(key==='policy')return viewStreamPolicy(s);
+  if(key==='disclosure')return viewStreamDisclosure(s);
+  if(key==='osint')return viewStreamOsint(s);
+  if(key==='ranked')return viewStreamRanked(s);
+  return viewStreamPipeline(s);
+}
+
+/* ---------- PROSPECTS ---------- */
+function priRank(p){const m=/^P([123])/.exec(p||'');return m?+m[1]:9;}
+function prospectCard(p,i){
+  const reg=DATA.evidence_register||{};
+  const evd=(p.evidence_ids||[]).map(id=>({id,r:reg[id]})).filter(x=>x.r);
+  const ai=p.ai_draft||{};
+  const aiFields=[['pain_point','Pain point'],['tag_wedge','TAG wedge'],['public_buyer','Public buyer + role'],['intro_path','Intro path'],['next_action','Next action']]
+    .filter(([k])=>ai[k]).map(([k,l])=>`<div class="aicell"><div class="al">${l} <span class="aichip">AI draft</span></div>${esc(ai[k])}</div>`).join('');
+  const chips=[
+    p.bd_priority?`<span class="tag ${priCls(p.bd_priority)}">${esc(p.bd_priority)}</span>`:'',
+    p.signal_band?bandTag(p.signal_band):'',
+    p.india_presence?`<span class="tag plain">${esc(p.india_presence)}</span>`:'',
+    p.is_foreign?'<span class="tag foreign">foreign</span>':'',
+    p.deal_value?`<span class="tag geo mono">${esc(p.deal_value)}</span>`:'',
+    p.type?`<span class="tag plain">${esc(p.type)}</span>`:'',
+    p.whitespace_label?`<span class="tag plain">${esc(p.whitespace_label)}</span>`:'',
+  ].join('');
+  const evList=evd.map(x=>`<div class="cart"><div class="cs">${esc(x.r.publisher||'—')}</div><div class="ch" title="${esc(x.r.headline)}">${titleLink(x.r.headline,x.r.url)}</div><div class="cd">${shortDate(x.r.date)}</div>${extLink(x.r.url)||'<span style="width:16px"></span>'}</div>`).join('');
+  return `<div class="prospect ${priBorder(p.bd_priority)}"><div class="ptop"><div class="prank">${i+1}</div><div class="pmain">
+    <div class="pco"><h3>${esc(p.company)}</h3>${chips}</div>
+    ${p.trigger?`<div class="ptrigger"><span class="tk"><i class="ti ti-bolt"></i>Trigger</span>${esc(p.trigger)}</div>`:''}
+    <div class="pthesis">${p.why_now?`<b>Why now:</b> ${esc(p.why_now)}`:''}${p.why_now&&p.tag_play?' · ':''}${p.tag_play?`<b>TAG play:</b> ${esc(p.tag_play)}`:''}</div>
+    ${aiFields?`<div class="aigrid">${aiFields}</div>`:''}</div>
+    <div class="pscore">
+      <div class="sblock"><div class="sl"><span>Signal score</span></div><span class="sval2">${num(p.signal_score,0)}</span> ${bandTag(p.signal_band)}</div>
+      <div class="sblock"><div class="sl"><span>Momentum</span></div><span class="sval2">${num(p.momentum,1)}</span></div>
+      <div class="sblock"><div class="sl"><span>BD score</span></div><span class="sval2">${p.bd_score==null?'—':esc(p.bd_score)}</span></div>
+      ${p.fee_viability?`<div class="sblock"><div class="sl"><span>Fee viability</span></div><span style="font-size:12px">${esc(p.fee_viability)}</span></div>`:''}
+    </div></div>
+    <div class="pfoot">
+      <span class="fmeta"><i class="ti ti-broadcast"></i>${dash(p.signals)}</span>
+      <span class="fmeta"><i class="ti ti-clock"></i>last ${shortDate(p.last_signal)}</span>
+      ${p.confidence?`<span class="fmeta"><i class="ti ti-shield-check"></i>${confTag(p.confidence)}</span>`:''}
+      ${p.geo?`<span class="fmeta"><span class="tag geo">${esc(p.geo)}</span></span>`:''}
+      <div class="fspace"></div>
+      <button class="fbtn" onclick="toggleEl('evid-${i}');document.getElementById('evid-${i}').classList.toggle('open')" style="border:1px solid var(--line-2)"><i class="ti ti-file-search"></i>Evidence (${evd.length})</button>
+    </div>
+    <div class="evid" id="evid-${i}" style="display:none"><div class="et">Evidence register — ${evd.length} item${evd.length===1?'':'s'}</div>${evList||emptyState('No register entries linked.')}</div></div>`;
+}
+function viewProspects(){
+  const P=(DATA.prospects||[]).slice().sort((a,b)=>priRank(a.bd_priority)-priRank(b.bd_priority)||(b.signal_score||0)-(a.signal_score||0));
+  return `<div class="eyebrow">BD candidate queue</div><div class="phead"><h1>Prospects</h1></div>
+  <p class="psub">Operators surfaced by this run's signals, ordered by BD priority then Signal Score. AI-drafted fields are marked — everything else is pipeline-computed from evidence.</p>
+  <div class="pfeed">${P.length?P.map(prospectCard).join(''):`<div class="panel">${emptyState('No prospects in this run.')}</div>`}</div>`;
+}
+
+/* ---------- MD VIEW / GCC / AI / HEALTH ---------- */
+function viewMD(){
+  const rows=DATA.md_view||[];
+  const cols=[{label:'Priority',key:'priority'},{label:'Account',key:'account'},{label:'India stage',key:'india_stage'},{label:'Trigger',style:'width:24%'},{label:'Why now'},{label:'TAG wedge'}];
+  const rowFn=m=>`<tr><td><span class="tag ${priCls(m.priority)}">${esc(m.priority||'—')}</span></td><td class="cellh"><b>${esc(m.account||'—')}</b></td>
+    <td>${dash(m.india_stage)}</td><td style="font-size:12px">${dash(m.trigger)}</td><td style="font-size:12px;color:var(--ink-2)">${dash(m.why_now)}</td><td>${dash(m.tag_wedge)}</td></tr>`;
+  return `<div class="eyebrow">One-screen partner brief</div><div class="phead"><h1>MD View</h1></div>
+  <p class="psub">The distilled call sheet — priority accounts, the trigger, and TAG's wedge. Built for a 90-second read.</p>
+  ${rows.length?renderTable('tblMD',cols,rows,rowFn,null):`<div class="panel">${emptyState('No MD rows in this run.')}</div>`}`;
+}
+function viewGCC(){
+  const rows=DATA.gcc_watch||[];
+  const cols=[{label:'Company',key:'company'},{label:'Geo',key:'geo'},{label:'Latest signal',key:'latest_signal'},{label:'Note',style:'width:50%'}];
+  const rowFn=g=>`<tr><td class="cellh"><b>${esc(g.company||'—')}</b></td><td><span class="tag geo">${esc(g.geo||'—')}</span></td>
+    <td class="mono">${shortDate(g.latest_signal)}</td><td style="font-size:12px;color:var(--ink-2)">${dash(g.note)}</td></tr>`;
+  return `<div class="eyebrow">Regional radar</div><div class="phead"><h1>GCC Watch</h1></div>
+  <p class="psub">GCC-based operators with no India signal yet — watched for the moment they turn toward the India corridor.</p>
+  ${rows.length?renderTable('tblGCC',cols,rows,rowFn,'latest_signal'):`<div class="panel">${emptyState('No GCC watch entries in this run.')}</div>`}`;
+}
+function viewAI(){
+  const a=DATA.ai_summary||{};
+  const head=`<div class="eyebrow">Machine-drafted brief</div><div class="phead"><h1>AI Summary</h1></div>`;
+  if(!a.text)return head+`<div class="panel">${emptyState('No AI summary was generated for this run.')}</div>`;
+  return head+`<div class="aipanel"><div class="aimeta">
+      <span class="aichip">AI draft</span>
+      <span class="fmeta"><i class="ti ti-circle-check"></i>status <b>${esc(a.status||'—')}</b></span>
+      <span class="fmeta"><i class="ti ti-clock"></i>generated <b>${esc(a.generated||'—')}</b></span></div>
+    <pre>${esc(a.text)}</pre></div>`;
+}
+function viewHealth(){
+  const feeds=(DATA.health&&DATA.health.feeds)||{};
+  const names=Object.keys(feeds);
+  const stTag=s=>`<span class="tag ${s==='ok'?'hi':s==='quiet'?'md':'p1'}">${esc(s)}</span>`;
+  const rows=names.map(n=>({name:n,items:feeds[n].items,status:feeds[n].status}));
+  const cols=[{label:'Feed',key:'name'},{label:'Items this run',key:'items'},{label:'Status',key:'status'}];
+  const rowFn=f=>`<tr><td class="cellh"><b>${esc(f.name)}</b></td><td class="mono">${f.items??'—'}</td><td>${stTag(f.status)}</td></tr>`;
+  return `<div class="eyebrow">Pipeline diagnostics</div><div class="phead"><h1>Feed health</h1></div>
+  <p class="psub">Per-feed item counts from the last pipeline run. Data as of <b class="mono">${esc(DATA.generated_at||'—')}</b> · scoring ${esc(DATA.scoring_version||'—')} · schema ${esc(DATA.schema_version||'—')}.</p>
+  ${names.length?renderTable('tblHealth',cols,rows,rowFn,'items'):`<div class="panel">${emptyState('No feed health data in this run.')}</div>`}`;
+}
+function viewSoon(name,icon,desc){
+  return `<div class="shero" style="background:linear-gradient(110deg,#3a3f52,#4a4f66)"><div class="sicon"><i class="ti ti-lock"></i></div><div><h1>${esc(name)}</h1><p>Scoped for a later milestone</p></div></div>
+  <div class="soon-pg"><i class="ti ${icon} big"></i><h3>${esc(name)} lands in a later milestone</h3><p>${esc(desc)}</p></div>`;
+}
+
+/* ---------- ROUTER ---------- */
+function crumb(parts){document.getElementById('crumb').innerHTML='<span class="clk" onclick="go(\'home\')">TAG</span>'+parts.map(p=>`<span class="sep">/</span>${p.click?`<span class="clk" onclick="${p.click}">${esc(p.t)}</span>`:`<b>${esc(p.t)}</b>`}`).join('');}
+function setNav(sel){document.querySelectorAll('.nlink').forEach(n=>n.classList.remove('on'));if(sel)sel.classList.add('on');}
+function paintAll(){for(const id in TBL)paintTbl(id);}
+function show(html){document.getElementById('view').innerHTML=html;paintAll();window.scrollTo(0,0);}
+
+function go(view){
+  if(!DATA)return;
+  for(const k in TBL)delete TBL[k];
+  setNav(document.querySelector(`.nlink[data-view="${view}"]`));
+  if(view==='home'){crumb([{t:'Overview'}]);show(viewHome());}
+  else if(view==='prospects'){crumb([{t:'Prospects'}]);show(viewProspects());}
+  else if(view==='md'){crumb([{t:'MD View'}]);show(viewMD());}
+  else if(view==='gcc'){crumb([{t:'GCC Watch'}]);show(viewGCC());}
+  else if(view==='ai'){crumb([{t:'AI Summary'}]);show(viewAI());}
+  else if(view==='health'){crumb([{t:'Feed health'}]);show(viewHealth());}
+  else if(view==='states'){crumb([{t:'State Targeting'}]);show(viewSoon('State Targeting','ti-map-pin','State-level incentive & land targeting for India data-centre builds. Ships in a later milestone on the same design system — standing it up is a data task, not a design one.'));}
+}
+function openSector(key){
+  if(!DATA)return;
+  for(const k in TBL)delete TBL[k];
+  setNav(document.querySelector(`.nlink[data-sector="${key}"]`));
+  if(key==='dc'){crumb([{t:'Sectors',click:"go('home')"},{t:'Data Centres'}]);show(viewSectorDC());}
+  else{crumb([{t:'Sectors',click:"go('home')"},{t:key}]);show(viewSoon(key,key==='Energy'?'ti-bolt':'ti-shield',`${key} comes online after Data Centres. Same six-stream template — news, policy, disclosures, OSINT, ranked operators and BD pipeline — pointed at ${key}-specific sources.`));}
+}
+function openStream(key){
+  if(!DATA)return;
+  for(const k in TBL)delete TBL[k];
+  const s=STREAMS.find(x=>x.key===key);if(!s)return;
+  setNav(document.querySelector('.nlink[data-sector="dc"]'));
+  crumb([{t:'Sectors',click:"go('home')"},{t:'Data Centres',click:"openSector('dc')"},{t:s.name}]);
+  show(viewStream(key));
+}
+
+document.getElementById('nav').addEventListener('click',e=>{const a=e.target.closest('.nlink');if(!a||!DATA)return;if(a.dataset.view)go(a.dataset.view);else if(a.dataset.sector)openSector(a.dataset.sector);});
+
+/* ---------- BOOT ---------- */
+function bootError(detail){
+  document.getElementById('view').innerHTML=`<div class="errpg"><i class="ti ti-plug-connected-x"></i>
+    <h3>Data feed unavailable</h3><p>data feed unavailable — check the daily pipeline run.<br>${esc(detail||'')}</p>
+    <button class="fbtn" onclick="boot()"><i class="ti ti-refresh"></i>Retry</button></div>`;
+}
+function boot(){
+  document.getElementById('view').innerHTML='<div class="loadpg"><div class="spin"></div>Loading intelligence feed…</div>';
+  fetch('./data.json',{cache:'no-store'}).then(r=>{
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return r.json();
+  }).then(d=>{
+    DATA=d;
+    const badge=document.getElementById('pBadge');if(badge)badge.textContent=(d.prospects||[]).length;
+    const feeds=(d.health&&d.health.feeds)||{};
+    const bad=Object.values(feeds).some(f=>f.status!=='ok');
+    const fr=document.getElementById('freshness');
+    fr.innerHTML=`<span class="fled ${bad?'warn':''}"></span>data as of ${esc(d.generated_at||'—')}`;
+    fr.onclick=()=>go('health');
+    go('home');
+  }).catch(err=>bootError(err&&err.message));
+}
+boot();
+</script></body></html>
