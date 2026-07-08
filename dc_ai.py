@@ -457,7 +457,7 @@ def _build_dossiers(movers, ents_by_cin, register, analyses):
         entity = (f"{e.get('ownership', '?')}/{e.get('company_class', '?')} · inc {e.get('inc_year', '?')} · {e.get('state', '?')}"
                   if e else "no MCA entity (foreign)")
         mom = (f"score {p.get('score')} ({_fmt_delta(p)}) · mom {p.get('momentum')} · "
-               f"{p.get('fresh_7d', 0)} new≤7d · {p.get('tier')}")
+               f"{p.get('fresh_7d', 0)} new≤7d · {p.get('signal_band')}")
         analysis = (analyses.get(co) or "").replace("|", "/").replace("\n", " ")
         lines.append(" | ".join([co, entity, mom, p.get("signals", ""), p.get("why_now", ""),
                                   p.get("tag_play", ""), analysis, _ev_labels(p, register)]))

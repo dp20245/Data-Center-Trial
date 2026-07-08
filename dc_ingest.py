@@ -251,6 +251,10 @@ def classify_policy(title, summary=""):
     policy heatmap — this replaces the old `.get(name, "regulation")` fallback
     that mis-tagged every unmapped feed as regulation."""
     text = f"{title or ''} {summary or ''}".lower()
+    # State name + policy co-keyword => state-DC-policy (bare state names never match)
+    if (any(s in text for s in dc.POLICY_STATE_NAMES)
+            and any(k in text for k in dc.POLICY_CO_KEYWORDS)):
+        return "state-DC-policy"
     for cls, kws in dc.POLICY_CLASSES.items():
         if any(k in text for k in kws):
             return cls
@@ -296,6 +300,8 @@ def _selfcheck_policy():
     # R5 fixtures
     assert classify_policy("India data centre market size to reach $12bn") == "market-commentary"
     assert classify_policy("Maharashtra data centre policy incentive notified") == "state-DC-policy"
+    assert classify_policy("Karnataka startup raises funding near data hub") == "market-commentary"
+    assert classify_policy("Haryana cabinet notifies new data centre incentive") == "state-DC-policy"
     assert classify_policy("Open access rules for captive power amended") == "power-open-access"
     assert classify_policy("DPDP data protection rules for data localisation") == "data-localization-dpdp"
     assert classify_policy("New PLI scheme announced for electronics") == "govt-scheme-incentive"
